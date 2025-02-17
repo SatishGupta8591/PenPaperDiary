@@ -187,11 +187,19 @@ app.get("/todos/completed/:date", async (req, res) => {
 
 app.get("/todos/count", async (req, res) => {
   try {
+    const userId = req.query.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
     const totalCompletedTodos = await Todo.countDocuments({
+      userId: userId,
       status: "completed",
     }).exec();
 
     const totalPendingTodos = await Todo.countDocuments({
+      userId: userId,
       status: "pending",
     }).exec();
 

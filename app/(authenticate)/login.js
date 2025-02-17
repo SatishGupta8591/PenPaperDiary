@@ -33,12 +33,10 @@ axios.interceptors.response.use(
   }
 );
 
-const Login = () => {  // Changed from 'login' to 'Login'
+const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
-
-  // 2. Add loading state
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,7 +44,12 @@ const Login = () => {  // Changed from 'login' to 'Login'
       try {
         const token = await AsyncStorage.getItem("authToken");
         if (token) {
-          router.replace("/(tabs)/home");
+          const userId = await AsyncStorage.getItem("userId"); // Get userId
+          if (userId) {
+            router.replace("/(tabs)/home");
+          } else {
+            router.replace("/(authenticate)/login"); // If no userId, go to login
+          }
         }
       } catch (error) {
         console.log(error);
@@ -54,30 +57,26 @@ const Login = () => {  // Changed from 'login' to 'Login'
     };
     checkLoginStatus();
   }, []);
-  
+
   const handleLogin = async () => {
     try {
       if (!email || !password) {
         Alert.alert("Error", "Please enter both email and password");
         return;
       }
-  
+
       setLoading(true);
-      console.log("Attempting login with:", { email, password });
-  
       const response = await axios.post("http://192.168.1.109:8000/login", {
-        email: email.trim().toLowerCase(), // Normalize email
-        password: password
+        email: email.trim().toLowerCase(),
+        password: password,
       });
-  
-      console.log("Server response:", response.data);
-  
+
       if (response.data.token && response.data.userId && response.data.name) {
         try {
           await AsyncStorage.multiSet([
             ["authToken", response.data.token],
             ["userId", response.data.userId.toString()],
-            ["userName", response.data.name || ""]
+            ["userName", response.data.name || ""],
           ]);
           router.replace("/(tabs)/home");
         } catch (storageError) {
@@ -94,7 +93,6 @@ const Login = () => {  // Changed from 'login' to 'Login'
       setLoading(false);
     }
   };
-  
 
   const renderLoginButton = () => (
     <Pressable
@@ -228,6 +226,6 @@ const Login = () => {  // Changed from 'login' to 'Login'
   );
 };
 
-export default Login;  // Changed from 'login' to 'Login'
+export default Login;
 
 const styles = StyleSheet.create({});
