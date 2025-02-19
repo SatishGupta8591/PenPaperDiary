@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, Modal, FlatList } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, Modal, FlatList, Alert } from 'react-native';
 import React, { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,12 +8,14 @@ import axios from 'axios';
 
 const AddDiary = () => {
   const router = useRouter();
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const params = useLocalSearchParams();
+  const [title, setTitle] = useState(params?.title || '');
+  const [content, setContent] = useState(params?.content || '');
   const [date, setDate] = useState(new Date().toLocaleDateString());
   const [categories, setCategories] = useState(["Work", "Personal", "Health", "Finance", "Others"]);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(params?.category || '');
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
+  const isEditing = params?.isEditing === 'true';
 
   // Function to toggle the category modal
   const toggleCategoryModal = () => {
@@ -25,6 +27,7 @@ const AddDiary = () => {
     setSelectedCategory(category);
     toggleCategoryModal();
   };
+
   const handleSave = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -35,13 +38,18 @@ const AddDiary = () => {
         category: selectedCategory || 'Others'
       };
 
-      const response = await axios.post('http://192.168.1.109:8000/diary', diaryData);
-      
-      if (response.data) {
-        router.back(); // Go back to diary list
+      if (isEditing) {
+        // Update existing diary
+        await axios.put(`http://192.168.1.109:8000/diary/${params.diaryId}`, diaryData);
+      } else {
+        // Create new diary
+        await axios.post('http://192.168.1.109:8000/diary', diaryData);
       }
+      
+      router.back();
     } catch (error) {
       console.log("Error saving diary:", error);
+      Alert.alert("Error", "Failed to save diary entry");
     }
   };
 
@@ -52,10 +60,12 @@ const AddDiary = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Entry</Text>
+        <Text style={styles.headerTitle}>
+          {isEditing ? 'Edit Entry' : 'Add New Entry'}
+        </Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-  <Text style={styles.saveButtonText}>Save</Text>
-</TouchableOpacity>
+          <Text style={styles.saveButtonText}>Save</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Form */}
@@ -92,7 +102,6 @@ const AddDiary = () => {
           multiline
           textAlignVertical="top"
         />
-
 
         {/* Image Icon */}
         <TouchableOpacity style={styles.imageIconContainer}>

@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const diarySchema = new mongoose.Schema({
   userId: {
@@ -21,7 +21,11 @@ const diarySchema = new mongoose.Schema({
   date: {
     type: Date,
     default: Date.now
+  },
+  isArchived: {
+    type: Boolean,
+    default: false
   }
 });
 
-module.exports = mongoose.model("Diary", diarySchema);
+module.exports = mongoose.model('Diary', diarySchema);

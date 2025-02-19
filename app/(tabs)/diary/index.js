@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Modal, Pressable, Animated } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Modal, Pressable, Animated, Alert } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router'; // Import useLocalSearchParams
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import moment from 'moment';
@@ -14,12 +14,13 @@ import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
 const DiaryScreen = () => {
   const [diaries, setDiaries] = useState([]);
   const router = useRouter();
+  const { date } = useLocalSearchParams(); // Get the date parameter
   const [isMenuVisible, setMenuVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current; // Sidebar animation
 
   useEffect(() => {
     fetchDiaries();
-  }, []);
+  }, [date]); // Refetch diaries when the date changes
 
   const fetchDiaries = async () => {
     try {
@@ -28,11 +29,13 @@ const DiaryScreen = () => {
         console.log("No userId found");
         return;
       }
-      console.log("Fetching diaries for userId:", userId);
-      const response = await axios.get(`http://192.168.1.109:8000/diary/${userId}`);
-      console.log("Received diaries:", JSON.stringify(response.data, null, 2));
 
-      // Correct user filtering
+      let apiUrl = `http://192.168.1.109:8000/diary/${userId}`;
+      if (date) {
+        apiUrl += `?date=${date}`; // Append date to the API URL
+      }
+
+      const response = await axios.get(apiUrl);
       const userDiaries = response.data.diaries.filter(diary => diary.userId === userId);
       setDiaries(userDiaries || []);
     } catch (error) {
@@ -43,7 +46,7 @@ const DiaryScreen = () => {
 
   const onRefresh = React.useCallback(() => {
     fetchDiaries();
-  }, []);
+  }, [date]);
 
   const toggleMenu = () => {
     setMenuVisible(!isMenuVisible);
@@ -55,6 +58,52 @@ const DiaryScreen = () => {
       useNativeDriver: true,
     }).start();
   }, [isMenuVisible]);
+
+  const navigateToCalendarView = () => {
+    setMenuVisible(false); // Close the menu
+    router.push("/calendar"); // Navigate to the calendar route
+  };
+
+  const handleViewDiaryEntries = () => {
+    router.push({
+      pathname: "/diary",
+      params: { date: selectedDate }
+    });
+  };
+
+  const handleEditDiary = (diary) => {
+    Alert.alert(
+      "Edit Diary",
+      "Are you sure you want to edit this diary entry?",
+      [
+        {
+          text: "No",
+          style: "cancel"
+        },
+        {
+          text: "Yes",
+          onPress: () => {
+            router.push({
+              pathname: "/diary/add_diary",
+              params: {
+                isEditing: true,
+                diaryId: diary._id,
+                title: diary.title,
+                content: diary.content,
+                category: diary.category
+              }
+            });
+          }
+        }
+      ],
+      { cancelable: false }
+    );
+  };
+
+  const handleArchiveEntries = () => {
+    setMenuVisible(false);
+    router.push('/(tabs)/diary/archive');  // Update this line with correct path
+  };
 
   return (
     <View style={styles.container}>
@@ -73,7 +122,15 @@ const DiaryScreen = () => {
           keyExtractor={(item) => item._id.toString()}
           renderItem={({ item }) => (
             <View style={styles.diaryItem}>
-              <Text style={styles.diaryTitle}>{item.title || 'Untitled'}</Text>
+              <View style={styles.diaryHeader}>
+                <Text style={styles.diaryTitle}>{item.title || 'Untitled'}</Text>
+                <TouchableOpacity 
+                  onPress={() => handleEditDiary(item)} 
+                  style={styles.editButton}
+                >
+                  <MaterialIcons name="edit" size={24} color="#007BFF" />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.diaryContent} numberOfLines={3}>
                 {item.content || 'No content'}
               </Text>
@@ -119,7 +176,7 @@ const DiaryScreen = () => {
               <FontAwesome5 name="list-alt" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>All Entries</Text>
             </Pressable>
-            <Pressable style={styles.modalOption} onPress={() => { setMenuVisible(false); }}>
+            <Pressable style={styles.modalOption} onPress={navigateToCalendarView}>
               <AntDesign name="calendar" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>Calendar View</Text>
             </Pressable>
@@ -127,9 +184,24 @@ const DiaryScreen = () => {
               <MaterialCommunityIcons name="tag-heart-outline" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>Tags</Text>
             </Pressable>
+            <Pressable style={styles.modalOption} onPress={handleArchiveEntries}>
+              <MaterialIcons name="archive" size={24} color="white" style={styles.iconStyle} />
+              <Text style={styles.textStyle}>Archive Entries</Text>
+            </Pressable>
             <Pressable style={styles.modalOption} onPress={() => { setMenuVisible(false); }}>
               <SimpleLineIcons name="settings" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>Settings</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleViewDiaryEntries}
+              style={{
+                backgroundColor: "#007BFF",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 5,
+              }}
+            >
+              <Text style={{ color: "white", fontSize: 14 }}>View Diary Entries</Text>
             </Pressable>
           </Animated.View>
         </View>
@@ -206,6 +278,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginVertical: 5,
     elevation: 2,
+  },
+  diaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  editButton: {
+    padding: 5,
   },
   diaryTitle: {
     fontSize: 18,

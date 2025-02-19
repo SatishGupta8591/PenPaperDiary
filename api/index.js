@@ -252,20 +252,43 @@ app.get("/user", async (req, res) => {
 
 const Diary = require("./models/diary");
 
-// Modify the GET endpoint
+// Modify the GET endpoint for diaries
 app.get("/diary/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
-    console.log("Fetching diaries for userId:", userId);
-    
-    // Only fetch diaries for the specific user
-    const diaries = await Diary.find({ userId: userId }).sort({ date: -1 });
-    console.log("Found diaries:", diaries.length);
-    
+    const date = req.query.date;
+    console.log("Fetching diaries for userId:", userId, "and date:", date);
+
+    let query = { userId: userId };
+
+    if (date) {
+      query.date = {
+        $gte: new Date(`${date}T00:00:00.000Z`),
+        $lt: new Date(`${date}T23:59:59.999Z`),
+      };
+    }
+
+    const diaries = await Diary.find(query).sort({ date: -1 });
     res.status(200).json({ diaries });
   } catch (error) {
     console.error("Error fetching diaries:", error);
     res.status(500).json({ error: "Failed to fetch diaries" });
+  }
+});
+
+// Add this new endpoint for archived diaries
+app.get("/diary/:userId/archived", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const archivedDiaries = await Diary.find({
+      userId: userId,
+      isArchived: true
+    }).sort({ date: -1 });
+    
+    res.status(200).json({ diaries: archivedDiaries });
+  } catch (error) {
+    console.error("Error fetching archived diaries:", error);
+    res.status(500).json({ error: "Failed to fetch archived diaries" });
   }
 });
 
@@ -291,6 +314,37 @@ app.post("/diary", async (req, res) => {
   } catch (error) {
     console.error("Error saving diary:", error);
     res.status(500).json({ error: "Failed to save diary" });
+  }
+});
+
+// Add this endpoint for updating diaries
+app.put("/diary/:diaryId", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+    const { userId, title, content, category } = req.body;
+    
+    const updatedDiary = await Diary.findByIdAndUpdate(
+      diaryId,
+      {
+        title,
+        content,
+        category,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+    
+    if (!updatedDiary) {
+      return res.status(404).json({ error: "Diary entry not found" });
+    }
+    
+    res.status(200).json({ 
+      message: "Diary updated successfully", 
+      diary: updatedDiary 
+    });
+  } catch (error) {
+    console.error("Error updating diary:", error);
+    res.status(500).json({ error: "Failed to update diary" });
   }
 });
 
@@ -417,6 +471,32 @@ app.get("/todos/:todoId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching todo:", error);
     res.status(500).json({ message: "Error fetching todo" });
+  }
+});
+
+// Add the new endpoint for fetching completed todos by userId and date
+app.get("/todos/:userId/completed", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const date = req.query.date;
+
+    if (!userId || !date) {
+      return res.status(400).json({ error: "userId and date are required" });
+    }
+
+    const completedTodos = await Todo.find({
+      userId: userId,
+      status: "completed",
+      completedAt: {
+        $gte: new Date(`${date}T00:00:00.000Z`),
+        $lt: new Date(`${date}T23:59:59.999Z`)
+      }
+    }).sort({ completedAt: -1 });
+
+    res.status(200).json({ completedTodos });
+  } catch (error) {
+    console.error("Error fetching completed todos:", error);
+    res.status(500).json({ error: "Failed to fetch completed todos" });
   }
 });
 

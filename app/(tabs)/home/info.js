@@ -244,9 +244,9 @@ const Info = () => {
                 <Pressable onPress={() => markSubtaskAsCompleted(item._id)}>
                   <Ionicons name="checkmark-circle-outline" size={24} color="black" />
                 </Pressable>
-                <Pressable onPress={() => editSubtask(item._id, "New Title")}>
+               <Pressable onPress={() => editSubtask(item._id, "New Title")}>
                   <Feather name="edit" size={24} color="black" />
-                </Pressable>
+               </Pressable>
                 <Pressable onPress={() => deleteSubtask(item._id)}>
                   <EvilIcons name="trash" size={24} color="black" />
                 </Pressable>
