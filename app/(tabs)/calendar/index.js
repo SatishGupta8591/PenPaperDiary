@@ -29,7 +29,7 @@ const index = () => {
 
       // Updated API endpoint
       const response = await axios.get(
-        `http://192.168.1.109:8000/todos/${userId}/completed`,
+        `http://192.168.1.110:8000/todos/${userId}/completed`,
         {
           params: { date: selectedDate }
         }
@@ -57,7 +57,7 @@ const index = () => {
       }
 
       const response = await axios.get(
-        `http://192.168.1.109:8000/diary/${userId}?date=${date}`
+        `http://192.168.1.110:8000/diary/${userId}?date=${date}`
       );
       
       // Filter entries to only show entries for the exact selected date

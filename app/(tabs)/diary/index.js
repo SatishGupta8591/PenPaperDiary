@@ -11,6 +11,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
 
+//const cors = require("cors");
+//app.use(cors());
+
 const DiaryScreen = () => {
   const [diaries, setDiaries] = useState([]);
   const router = useRouter();
@@ -30,7 +33,7 @@ const DiaryScreen = () => {
         return;
       }
 
-      let apiUrl = `http://192.168.1.109:8000/diary/${userId}`;
+      let apiUrl = `http://192.168.1.110:8000/diary/${userId}`;
       if (date) {
         apiUrl += `?date=${date}`; // Append date to the API URL
       }
@@ -105,6 +108,71 @@ const DiaryScreen = () => {
     router.push('/(tabs)/diary/archive');  // Update this line with correct path
   };
 
+  const handleLongPress = (diary) => {
+    Alert.alert(
+      "Diary Options",
+      "Choose an action",
+      [
+        {
+          text: "Archive",
+          onPress: () => handleArchiveDiary(diary._id),
+          style: "default"
+        },
+        {
+          text: "Delete",
+          onPress: () => handleDeleteDiary(diary._id),
+          style: "destructive"
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleArchiveDiary = async (diaryId) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
+
+      const response = await axios.patch(
+        `http://192.168.1.110:8000/diary/${diaryId}/archive`
+      );
+
+      if (response.data.diary) {
+        setDiaries((prevDiaries) =>
+          prevDiaries.filter((diary) => diary._id !== diaryId)
+        );
+        Alert.alert("Success", "Diary archived successfully");
+      }
+    } catch (error) {
+      console.error("Error archiving diary:", error);
+      Alert.alert(
+        "Error",
+        "Failed to archive diary. Please try again."
+      );
+    }
+  };
+
+  const handleDeleteDiary = async (diaryId) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) return;
+
+      await axios.delete(`http://192.168.1.110:8000/diary/${diaryId}`);
+      fetchDiaries(); // Refresh the list
+      Alert.alert("Success", "Diary deleted successfully");
+    } catch (error) {
+      console.error("Error deleting diary:", error);
+      Alert.alert("Error", "Failed to delete diary");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -121,24 +189,29 @@ const DiaryScreen = () => {
           data={diaries}
           keyExtractor={(item) => item._id.toString()}
           renderItem={({ item }) => (
-            <View style={styles.diaryItem}>
-              <View style={styles.diaryHeader}>
-                <Text style={styles.diaryTitle}>{item.title || 'Untitled'}</Text>
-                <TouchableOpacity 
-                  onPress={() => handleEditDiary(item)} 
-                  style={styles.editButton}
-                >
-                  <MaterialIcons name="edit" size={24} color="#007BFF" />
-                </TouchableOpacity>
+            <TouchableOpacity 
+              onLongPress={() => handleLongPress(item)}
+              delayLongPress={500} // Half second delay for long press
+            >
+              <View style={styles.diaryItem}>
+                <View style={styles.diaryHeader}>
+                  <Text style={styles.diaryTitle}>{item.title || 'Untitled'}</Text>
+                  <TouchableOpacity 
+                    onPress={() => handleEditDiary(item)} 
+                    style={styles.editButton}
+                  >
+                    <MaterialIcons name="edit" size={24} color="#007BFF" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.diaryContent} numberOfLines={3}>
+                  {item.content || 'No content'}
+                </Text>
+                <Text style={styles.diaryDate}>
+                  {moment(item.date).format('MMM DD, YYYY')}
+                </Text>
+                <Text style={styles.diaryCategory}>{item.category || 'No Category'}</Text>
               </View>
-              <Text style={styles.diaryContent} numberOfLines={3}>
-                {item.content || 'No content'}
-              </Text>
-              <Text style={styles.diaryDate}>
-                {moment(item.date).format('MMM DD, YYYY')}
-              </Text>
-              <Text style={styles.diaryCategory}>{item.category || 'No Category'}</Text>
-            </View>
+            </TouchableOpacity>
           )}
           refreshing={false}
           onRefresh={onRefresh}

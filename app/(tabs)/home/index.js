@@ -77,7 +77,7 @@ const index = () => {
         title: todo,
         category: category,
       };
-      await axios.post(`http://192.168.1.109:8000/todos/${userId}`, todoData);
+      await axios.post(`http://192.168.1.110:8000/todos/${userId}`, todoData);
       await getUserTodos(userId);
       setModalVisible(false);
       setTodo("");
@@ -89,7 +89,7 @@ const index = () => {
   const getUserTodos = async (id) => {
     try {
       const response = await axios.get(
-        `http://192.168.1.109:8000/users/${id}/todos`
+        `http://192.168.1.110:8000/users/${id}/todos`
       );
       console.log(response.data.todos);
       setTodos(response.data.todos);
@@ -112,7 +112,7 @@ const index = () => {
     try {
       setMarked(true);
       const response = await axios.patch(
-        `http://192.168.1.109:8000/todos/${todoId}/complete`
+        `http://192.168.1.110:8000/todos/${todoId}/complete`
       );
       console.log(response.data);
       await getUserTodos(userId); // Refresh the todos list
@@ -124,7 +124,7 @@ const index = () => {
   const deleteTodo = async (todoId) => {
     try {
       const response = await axios.delete(
-        `http://192.168.1.109:8000/todos/${todoId}`
+        `http://192.168.1.110:8000/todos/${todoId}`
       );
       console.log(response.data);
       await getUserTodos(userId); // Refresh the todos list

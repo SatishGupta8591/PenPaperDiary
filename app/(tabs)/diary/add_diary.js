@@ -40,10 +40,10 @@ const AddDiary = () => {
 
       if (isEditing) {
         // Update existing diary
-        await axios.put(`http://192.168.1.109:8000/diary/${params.diaryId}`, diaryData);
+        await axios.put(`http://192.168.1.110:8000/diary/${params.diaryId}`, diaryData);
       } else {
         // Create new diary
-        await axios.post('http://192.168.1.109:8000/diary', diaryData);
+        await axios.post('http://192.168.1.110:8000/diary', diaryData);
       }
       
       router.back();

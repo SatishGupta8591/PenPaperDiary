@@ -34,7 +34,7 @@ const Index = () => {
     try {
       const token = await AsyncStorage.getItem("authToken");
       if (token) {
-        const response = await axios.get("http://192.168.1.109:8000/user", {
+        const response = await axios.get("http://192.168.1.110:8000/user", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -69,7 +69,7 @@ const Index = () => {
       }
 
       const response = await axios.get(
-        `http://192.168.1.109:8000/todos/count?userId=${userId}`
+        `http://192.168.1.110:8000/todos/count?userId=${userId}`
       );
       const { totalCompletedTodos, totalPendingTodos } = response.data;
 
@@ -119,7 +119,7 @@ const Index = () => {
       };
 
       const response = await axios.post(
-        `http://192.168.1.109:8000/todos/${userId}`,
+        `http://192.168.1.110:8000/todos/${userId}`,
         todoData
       );
 

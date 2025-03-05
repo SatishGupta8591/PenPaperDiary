@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const ArchiveScreen = () => {
   const [archivedDiaries, setArchivedDiaries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -16,15 +17,28 @@ const ArchiveScreen = () => {
 
   const fetchArchivedDiaries = async () => {
     try {
+      setLoading(true);
       const userId = await AsyncStorage.getItem('userId');
-      if (!userId) return;
+      if (!userId) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
 
       const response = await axios.get(
-        `http://192.168.1.109:8000/diary/${userId}/archived`
+        `http://192.168.1.110:8000/diary/${userId}/archived`
       );
-      setArchivedDiaries(response.data.diaries || []);
+
+      if (response.data.diaries) {
+        setArchivedDiaries(response.data.diaries);
+      }
     } catch (error) {
       console.error("Error fetching archived diaries:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.error || "Failed to fetch archived diaries"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,7 +54,9 @@ const ArchiveScreen = () => {
         <Text style={styles.headerTitle}>Archived Entries</Text>
       </View>
 
-      {archivedDiaries.length > 0 ? (
+      {loading ? (
+        <ActivityIndicator size="large" color="#007BFF" style={styles.loader} />
+      ) : archivedDiaries.length > 0 ? (
         <FlatList
           data={archivedDiaries}
           keyExtractor={(item) => item._id}
@@ -122,6 +138,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });
 
 export default ArchiveScreen;

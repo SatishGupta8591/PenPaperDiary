@@ -14,8 +14,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 mongoose
-  .connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/", {
-    dbName: 'PenPaperDiary'
+  .connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/PenPaperDiary", {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
   })
   .then(() => {
     console.log("Connected to MongoDB Atlas");
@@ -66,16 +67,16 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("Login attempt with:", { email, password }); // Debug log
+    console.log("Login attempt with:", { email, password });
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).maxTimeMS(5000); // Add timeout
 
     if (!user) {
-      console.log("User not found"); // Debug log
+      console.log("User not found");
       return res.status(401).json({ message: "Invalid Email" });
     }
 
@@ -83,21 +84,21 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    // Ensure `secretKey` is static
-    const secretKey = process.env.JWT_SECRET || "your-static-secret-key";
-
-    // ✅ Fix: Return userId along with the token
     const token = jwt.sign({ userId: user._id }, secretKey, { expiresIn: "7d" });
 
     res.status(200).json({
       token,
-      userId: user._id.toString(), // Convert ObjectId to string
-      name: user.name, // Also send user name to store in AsyncStorage
+      userId: user._id.toString(),
+      name: user.name,
     });
 
   } catch (error) {
     console.error("Login error details:", error);
-    res.status(500).json({ message: "Login failed", error: error.message });
+    res.status(500).json({ 
+      message: "Login failed", 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -348,6 +349,54 @@ app.put("/diary/:diaryId", async (req, res) => {
   }
 });
 
+// Archive diary endpoint
+app.patch("/diary/:diaryId/archive", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+
+    const updatedDiary = await Diary.findByIdAndUpdate(
+      diaryId,
+      {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!updatedDiary) {
+      return res.status(404).json({ error: "Diary not found" });
+    }
+
+    res.status(200).json({
+      message: "Diary archived successfully",
+      diary: updatedDiary,
+    });
+  } catch (error) {
+    console.error("Error archiving diary:", error);
+    res.status(500).json({ error: "Failed to archive diary" });
+  }
+});
+
+// Delete diary endpoint
+app.delete("/diary/:diaryId", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+    
+    const deletedDiary = await Diary.findByIdAndDelete(diaryId);
+
+    if (!deletedDiary) {
+      return res.status(404).json({ error: "Diary not found" });
+    }
+
+    res.status(200).json({ 
+      message: "Diary deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting diary:", error);
+    res.status(500).json({ error: "Failed to delete diary" });
+  }
+});
+
 // Remove the duplicate routes and keep only this one
 app.post("/todos/:todoId/subtasks", async (req, res) => {
   try {
@@ -497,6 +546,24 @@ app.get("/todos/:userId/completed", async (req, res) => {
   } catch (error) {
     console.error("Error fetching completed todos:", error);
     res.status(500).json({ error: "Failed to fetch completed todos" });
+  }
+});
+
+app.get("/health", async (req, res) => {
+  try {
+    const status = mongoose.connection.readyState;
+    const states = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    res.json({ 
+      status: states[status], 
+      isConnected: status === 1 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

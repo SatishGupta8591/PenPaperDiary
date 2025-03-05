@@ -36,7 +36,7 @@ const register = () => {
         password: password
       };
   
-      const response = await axios.post("http://192.168.1.109:8000/register", userData);
+      const response = await axios.post("http://192.168.1.110:8000/register", userData);
       
       if (response.data) {
         Alert.alert("Success", "Registration successful!");

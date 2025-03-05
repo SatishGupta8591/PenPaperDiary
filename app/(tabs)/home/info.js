@@ -27,7 +27,7 @@ const Info = () => {
     try {
       console.log("Fetching subtasks for todo:", params.id); // Debug log
 
-      const response = await axios.get(`http://192.168.1.109:8000/todos/${params.id}`);
+      const response = await axios.get(`http://192.168.1.110:8000/todos/${params.id}`);
       
       console.log("Fetched todo data:", response.data); // Debug log
 
@@ -51,7 +51,7 @@ const Info = () => {
       console.log("Adding subtask:", { todoId: params.id, title: newSubtask }); // Debug log
 
       const response = await axios.post(
-        `http://192.168.1.109:8000/todos/${params.id}/subtasks`,
+        `http://192.168.1.110:8000/todos/${params.id}/subtasks`,
         {
           title: newSubtask.trim()
         }
@@ -75,7 +75,7 @@ const Info = () => {
   const markSubtaskAsCompleted = async (subtaskId) => {
     try {
       const response = await axios.patch(
-        `http://192.168.1.109:8000/todos/${params.id}/subtasks/${subtaskId}/complete`
+        `http://192.168.1.110:8000/todos/${params.id}/subtasks/${subtaskId}/complete`
       );
       console.log("Subtask marked as completed:", response.data);
       fetchSubtasks();
@@ -91,7 +91,7 @@ const Info = () => {
   const deleteSubtask = async (subtaskId) => {
     try {
       const response = await axios.delete(
-        `http://192.168.1.109:8000/todos/${params.id}/subtasks/${subtaskId}`
+        `http://192.168.1.110:8000/todos/${params.id}/subtasks/${subtaskId}`
       );
       console.log("Subtask deleted:", response.data);
       fetchSubtasks();
@@ -107,7 +107,7 @@ const Info = () => {
   const editSubtask = async (subtaskId, newTitle) => {
     try {
       const response = await axios.patch(
-        `http://192.168.1.109:8000/todos/${params.id}/subtasks/${subtaskId}`,
+        `http://192.168.1.110:8000/todos/${params.id}/subtasks/${subtaskId}`,
         { title: newTitle }
       );
       console.log("Subtask edited:", response.data);
