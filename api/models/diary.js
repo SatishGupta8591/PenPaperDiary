@@ -22,9 +22,22 @@ const diarySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  images: [{
+    type: String,
+    validate: {
+      validator: function(v) {
+        return v.startsWith('data:image/');
+      },
+      message: 'Invalid image format'
+    }
+  }],
   isArchived: {
     type: Boolean,
     default: false
+  },
+  archivedAt: {
+    type: Date,
+    default: null
   }
 });
 

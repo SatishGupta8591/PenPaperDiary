@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Modal, Pressable, Animated, Alert } from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router'; // Import useLocalSearchParams
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Modal, Pressable, Animated, Alert, Image, AppState } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import moment from 'moment';
@@ -10,23 +10,69 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import SimpleLineIcons from '@expo/vector-icons/SimpleLineIcons';
+import { FontAwesome } from '@expo/vector-icons';  // Fix FontAwesome import
+import PinModal from '../../../components/PinModal';
+import { useFocusEffect } from '@react-navigation/native';
 
-//const cors = require("cors");
-//app.use(cors());
-
-const DiaryScreen = () => {
+function DiaryScreen() {
+  // State declarations
   const [diaries, setDiaries] = useState([]);
-  const router = useRouter();
-  const { date } = useLocalSearchParams(); // Get the date parameter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredDiaries, setFilteredDiaries] = useState([]);
   const [isMenuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-300)).current; // Sidebar animation
+  const [isPinModalVisible, setPinModalVisible] = useState(false);
+  const [isPinSet, setIsPinSet] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitialCheck, setIsInitialCheck] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDiaries();
-  }, [date]); // Refetch diaries when the date changes
+  // Refs
+  const slideAnim = useRef(new Animated.Value(-300)).current;
+  
+  // Router and params
+  const router = useRouter();
+  const { date } = useLocalSearchParams();
 
-  const fetchDiaries = async () => {
+  // Add these animation functions after the state declarations
+  const animateMenu = (toValue) => {
+    Animated.timing(slideAnim, {
+      toValue,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // check pin function
+  const checkPin = async () => {
     try {
+      if (isAuthenticated) return; // Don't check if already authenticated
+      
+      const userId = await AsyncStorage.getItem('userId');
+      const pin = await AsyncStorage.getItem(`securityPin_${userId}`);
+      const hasPin = !!pin;
+      setIsPinSet(hasPin);
+      
+      if (!hasPin && isInitialCheck) {
+        // First time user - show PIN setup
+        setPinModalVisible(true);
+        setIsInitialCheck(false);
+      } else if (hasPin && !isAuthenticated) {
+        // Existing user - need verification
+        setPinModalVisible(true);
+      }
+    } catch (error) {
+      console.error('Error checking PIN:', error);
+    }
+  };
+
+  // fetch diaries function
+  const fetchDiaries = async () => {
+    if (isLoading) return; // Prevent multiple calls
+    
+    try {
+      setIsLoading(true);
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) {
         console.log("No userId found");
@@ -35,46 +81,60 @@ const DiaryScreen = () => {
 
       let apiUrl = `http://192.168.1.110:8000/diary/${userId}`;
       if (date) {
-        apiUrl += `?date=${date}`; // Append date to the API URL
+        apiUrl += `?date=${date}`;
       }
 
       const response = await axios.get(apiUrl);
-      const userDiaries = response.data.diaries.filter(diary => diary.userId === userId);
+      // Filter out archived entries
+      const userDiaries = response.data.diaries.filter(
+        (diary) => diary.userId === userId && !diary.isArchived
+      );
       setDiaries(userDiaries || []);
+      setFilteredDiaries(response.data.diaries);
     } catch (error) {
       console.error("Error fetching diaries:", error);
       setDiaries([]);
+      setFilteredDiaries([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const onRefresh = React.useCallback(() => {
-    fetchDiaries();
-  }, [date]);
-
+  // Update the toggleMenu function
   const toggleMenu = () => {
-    setMenuVisible(!isMenuVisible);
+    if (isMenuVisible) {
+      animateMenu(-300); // Slide out
+      setTimeout(() => setMenuVisible(false), 300);
+    } else {
+      setMenuVisible(true);
+      animateMenu(0); // Slide in
+    }
   };
 
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: isMenuVisible ? 0 : -300,
-      useNativeDriver: true,
-    }).start();
-  }, [isMenuVisible]);
-
+  // navigate to calendar view function
   const navigateToCalendarView = () => {
     setMenuVisible(false); // Close the menu
     router.push("/calendar"); // Navigate to the calendar route
   };
 
+  // handle view diary entries function
   const handleViewDiaryEntries = () => {
+    if (!isAuthenticated) {
+      return; // Don't proceed if not authenticated
+    }
+    
     router.push({
       pathname: "/diary",
       params: { date: selectedDate }
     });
   };
 
+  // handle edit diary function
   const handleEditDiary = (diary) => {
+    if (!isAuthenticated) {
+      return; // Don't proceed if not authenticated
+    }
+
     Alert.alert(
       "Edit Diary",
       "Are you sure you want to edit this diary entry?",
@@ -87,13 +147,13 @@ const DiaryScreen = () => {
           text: "Yes",
           onPress: () => {
             router.push({
-              pathname: "/diary/add_diary",
+              pathname: "/(tabs)/diary/add_diary",
               params: {
                 isEditing: true,
                 diaryId: diary._id,
-                title: diary.title,
-                content: diary.content,
-                category: diary.category
+                initialTitle: diary.title,
+                initialContent: diary.content,
+                initialCategory: diary.category
               }
             });
           }
@@ -103,11 +163,13 @@ const DiaryScreen = () => {
     );
   };
 
+  // handle archive entries function
   const handleArchiveEntries = () => {
     setMenuVisible(false);
     router.push('/(tabs)/diary/archive');  // Update this line with correct path
   };
 
+  // handle long press function
   const handleLongPress = (diary) => {
     Alert.alert(
       "Diary Options",
@@ -132,6 +194,7 @@ const DiaryScreen = () => {
     );
   };
 
+  // handle archive diary function
   const handleArchiveDiary = async (diaryId) => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -148,6 +211,9 @@ const DiaryScreen = () => {
         setDiaries((prevDiaries) =>
           prevDiaries.filter((diary) => diary._id !== diaryId)
         );
+        setFilteredDiaries((prevDiaries) =>
+          prevDiaries.filter((diary) => diary._id !== diaryId)
+        );
         Alert.alert("Success", "Diary archived successfully");
       }
     } catch (error) {
@@ -159,6 +225,7 @@ const DiaryScreen = () => {
     }
   };
 
+  // handle delete diary function
   const handleDeleteDiary = async (diaryId) => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -173,6 +240,44 @@ const DiaryScreen = () => {
     }
   };
 
+  // handle search function
+  const handleSearch = (text) => {
+    setSearchQuery(text);
+    if (text.trim() === '') {
+      setFilteredDiaries(diaries);
+      return;
+    }
+
+    const filtered = diaries.filter((diary) => {
+      const titleMatch = diary.title.toLowerCase().includes(text.toLowerCase());
+      const contentMatch = diary.content.toLowerCase().includes(text.toLowerCase());
+      const categoryMatch = diary.category.toLowerCase().includes(text.toLowerCase());
+      return titleMatch || contentMatch || categoryMatch;
+    });
+    setFilteredDiaries(filtered);
+  };
+
+  // All hooks must be called before this line
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) {
+        checkPin();
+      }
+    }, [isAuthenticated])
+  );
+
+  useEffect(() => {
+    fetchDiaries();
+  }, [date, isAuthenticated]);
+
+  useEffect(() => {
+    setFilteredDiaries(diaries);
+  }, [diaries]);
+
+  const onRefresh = useCallback(() => {
+    fetchDiaries();
+  }, [date]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -180,18 +285,34 @@ const DiaryScreen = () => {
           <Text style={styles.menuIcon}>☰</Text>
         </Pressable>
         <View style={styles.searchBarWrapper}>
-          <TextInput style={styles.searchBar} placeholder="Search" placeholderTextColor="#666" />
+          <FontAwesome name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput 
+            style={styles.searchBar} 
+            placeholder="Search diary entries..." 
+            placeholderTextColor="#666"
+            value={searchQuery}
+            onChangeText={handleSearch}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => handleSearch('')}
+              style={styles.clearSearch}
+            >
+              <AntDesign name="close" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {diaries.length > 0 ? (
+      {filteredDiaries.length > 0 ? (
         <FlatList
-          data={diaries}
+          data={filteredDiaries}
           keyExtractor={(item) => item._id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity 
               onLongPress={() => handleLongPress(item)}
               delayLongPress={500} // Half second delay for long press
+              disabled={!isAuthenticated} // Disable interaction if not authenticated
             >
               <View style={styles.diaryItem}>
                 <View style={styles.diaryHeader}>
@@ -199,10 +320,18 @@ const DiaryScreen = () => {
                   <TouchableOpacity 
                     onPress={() => handleEditDiary(item)} 
                     style={styles.editButton}
+                    disabled={!isAuthenticated} // Disable edit button if not authenticated
                   >
-                    <MaterialIcons name="edit" size={24} color="#007BFF" />
+                    <MaterialIcons 
+                      name="edit" 
+                      size={24} 
+                      color={isAuthenticated ? "#007BFF" : "#ccc"} // Change color when disabled
+                    />
                   </TouchableOpacity>
                 </View>
+                {item.image && (
+                  <Image source={{ uri: item.image }} style={{ width: 100, height: 100 }} />
+                )}
                 <Text style={styles.diaryContent} numberOfLines={3}>
                   {item.content || 'No content'}
                 </Text>
@@ -220,22 +349,40 @@ const DiaryScreen = () => {
         <View style={styles.content}>
           <Text style={styles.icon}>📖</Text>
           <Text style={styles.message}>
-            No diary entry available{'\n'}Press Add button to add
+            {searchQuery.length > 0 
+              ? "No matching entries found" 
+              : "No diary entry available\nPress Add button to add"}
           </Text>
         </View>
       )}
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => router.push("/diary/add_diary")}
+        onPress={() => router.push("/(tabs)/diary/add_diary")}
       >
         <Text style={styles.addButtonText}>✏️</Text>
       </TouchableOpacity>
 
       {/* Sidebar Menu */}
-      <Modal animationType="none" transparent={true} visible={isMenuVisible}>
-        <View style={styles.centeredView}>
-          <Animated.View style={[styles.modalView, { transform: [{ translateX: slideAnim }] }]}>
+      <Modal 
+        animationType="none" 
+        transparent={true} 
+        visible={isMenuVisible}
+        onRequestClose={toggleMenu}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={toggleMenu}
+        >
+          <Animated.View 
+            style={[
+              styles.modalView,
+              {
+                transform: [{ translateX: slideAnim }],
+              },
+            ]}
+          >
             <TouchableOpacity onPress={toggleMenu} style={styles.closeButton}>
               <Text style={styles.closeText}>✖</Text>
             </TouchableOpacity>
@@ -277,8 +424,20 @@ const DiaryScreen = () => {
               <Text style={{ color: "white", fontSize: 14 }}>View Diary Entries</Text>
             </Pressable>
           </Animated.View>
-        </View>
+        </TouchableOpacity>
       </Modal>
+
+      <PinModal
+        isVisible={isPinModalVisible}
+        mode={isPinSet ? 'verify' : 'set'}
+        onClose={(verified) => {
+          setPinModalVisible(false);
+          if (verified) {
+            setIsAuthenticated(true);
+            fetchDiaries(); // This should be called after authentication is set
+          }
+        }}
+      />
     </View>
   );
 };
@@ -302,31 +461,41 @@ const styles = StyleSheet.create({
   },
   searchBarWrapper: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 5,
-    paddingHorizontal: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    marginLeft: 10,
+    paddingHorizontal: 15,
+    height: 40,
+  },
+  searchIcon: {
+    marginRight: 10,
   },
   searchBar: {
     flex: 1,
-    height: 40,
-    color: '#000',
+    fontSize: 16,
+    color: '#333',
+    padding: 0,
+  },
+  clearSearch: {
+    padding: 5,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   icon: {
-    fontSize: 64,
-    color: '#888',
-    marginBottom: 10,
+    fontSize: 50,
+    marginBottom: 20,
   },
   message: {
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    fontSize: 18,
-    color: '#888',
+    lineHeight: 24,
   },
   addButton: {
     position: 'absolute',
@@ -387,10 +556,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   modalView: {
-    backgroundColor: '#007bff', // Changed to match the app color
+    backgroundColor: '#007bff',
     padding: 20,
     width: 250,
     height: "100%",
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
   closeButton: {
     alignSelf: "flex-end",
@@ -414,7 +586,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   menuHeader: {
-    flexDirection: 'column', // Changed to column
+    flexDirection: 'column',
     alignItems: 'center',
     marginBottom: 20,
     marginTop: 10,
@@ -423,9 +595,19 @@ const styles = StyleSheet.create({
   menuHeaderText: {
     color: 'white',
     fontSize: 20,
-    marginLeft: 0, // Remove marginLeft
-    marginTop: 10, // Add marginTop for spacing
-    textAlign: 'center', // Center the text
+    marginLeft: 0,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  authContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
 

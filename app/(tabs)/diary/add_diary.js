@@ -1,56 +1,143 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, Modal, FlatList, Alert } from 'react-native';
-import React, { useState } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import AntDesign from '@expo/vector-icons/AntDesign';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  FlatList,
+  Modal,
+  Alert,
+  Image,
+  ScrollView,
+} from "react-native";
+import React, { useState, useEffect } from "react";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import moment from "moment";
+import { AntDesign, Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
 const AddDiary = () => {
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const [title, setTitle] = useState(params?.title || '');
-  const [content, setContent] = useState(params?.content || '');
-  const [date, setDate] = useState(new Date().toLocaleDateString());
-  const [categories, setCategories] = useState(["Work", "Personal", "Health", "Finance", "Others"]);
-  const [selectedCategory, setSelectedCategory] = useState(params?.category || '');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [date, setDate] = useState(moment().format("MMMM D, YYYY"));
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [categories, setCategories] = useState(["Personal", "Work", "Travel"]);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
-  const isEditing = params?.isEditing === 'true';
+  const router = useRouter();
+  const { isEditing, diaryId, initialTitle, initialContent, initialCategory } =
+    useLocalSearchParams();
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
 
-  // Function to toggle the category modal
+  useEffect(() => {
+    if (isEditing) {
+      setTitle(initialTitle || "");
+      setContent(initialContent || "");
+      setSelectedCategory(initialCategory || "");
+      // Load images from the diary entry
+      const loadDiary = async () => {
+        try {
+          const response = await axios.get(`http://192.168.1.110:8000/diary/${diaryId}`);
+          if (response.data.diary && response.data.diary.images) {
+            setSelectedImages(response.data.diary.images);
+          }
+        } catch (error) {
+          console.log("Error loading diary images:", error);
+        }
+      };
+      loadDiary();
+    }
+  }, [isEditing, initialTitle, initialContent, initialCategory, diaryId]);
+
+  const handleCategorySelect = (category) => {
+    setSelectedCategory(category);
+    setCategoryModalVisible(false);
+  };
+
   const toggleCategoryModal = () => {
     setCategoryModalVisible(!isCategoryModalVisible);
   };
 
-  // Function to handle category selection
-  const handleCategorySelect = (category) => {
-    setSelectedCategory(category);
-    toggleCategoryModal();
+  const pickImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,  // Use MediaTypeOptions instead of MediaType
+        allowsMultipleSelection: true,
+        aspect: [4, 3],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        const newImages = result.assets.map(asset => `data:image/jpeg;base64,${asset.base64}`);
+        setSelectedImages(prevImages => [...prevImages, ...newImages]);
+      }
+    } catch (error) {
+      console.log("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
   };
 
   const handleSave = async () => {
     try {
-      const userId = await AsyncStorage.getItem('userId');
+      if (!title.trim()) {
+        Alert.alert("Error", "Title is required");
+        return;
+      }
+      if (!content.trim()) {
+        Alert.alert("Error", "Content is required");
+        return;
+      }
+      if (!selectedCategory) {
+        Alert.alert("Error", "Please select a category");
+        return;
+      }
+
+      const userId = await AsyncStorage.getItem("userId");
+      if (!userId) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
+
       const diaryData = {
-        userId,
-        title,
-        content,
-        category: selectedCategory || 'Others'
+        userId: userId,
+        title: title.trim(),
+        content: content.trim(),
+        category: selectedCategory,
+        date: moment().format("YYYY-MM-DD"),
+        images: selectedImages || [], // Make sure images is always an array
       };
 
+      console.log("Sending diary data:", {
+        ...diaryData,
+        images: `${diaryData.images.length} images`
+      });
+
       if (isEditing) {
-        // Update existing diary
-        await axios.put(`http://192.168.1.110:8000/diary/${params.diaryId}`, diaryData);
+        await axios.put(
+          `http://192.168.1.110:8000/diary/${diaryId}`,
+          diaryData
+        );
       } else {
-        // Create new diary
-        await axios.post('http://192.168.1.110:8000/diary', diaryData);
+        await axios.post("http://192.168.1.110:8000/diary", diaryData);
       }
-      
+
       router.back();
     } catch (error) {
-      console.log("Error saving diary:", error);
+      console.log("Error saving diary:", error.response?.data || error);
       Alert.alert("Error", "Failed to save diary entry");
     }
+  };
+
+  const removeImage = (indexToRemove) => {
+    setSelectedImages(selectedImages.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleImagePress = (uri) => {
+    setSelectedImage(uri);
   };
 
   return (
@@ -61,7 +148,7 @@ const AddDiary = () => {
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Entry' : 'Add New Entry'}
+          {isEditing ? "Edit Entry" : "Add New Entry"}
         </Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>Save</Text>
@@ -69,52 +156,87 @@ const AddDiary = () => {
       </View>
 
       {/* Form */}
-      <View style={styles.form}>
-        {/* Date and Category Row */}
-        <View style={styles.row}>
-          {/* Calendar Icon and Date */}
-          <View style={styles.rowItem}>
-            <AntDesign name="calendar" size={24} color="black" />
-            <Text style={styles.dateText}>{date}</Text>
+      <View style={styles.formContainer}>
+        <ScrollView style={styles.scrollView}>
+          {/* Date and Category Row */}
+          <View style={styles.row}>
+            {/* Calendar Icon and Date */}
+            <View style={styles.rowItem}>
+              <AntDesign name="calendar" size={24} color="black" />
+              <Text style={styles.dateText}>{date}</Text>
+            </View>
+            {/* Tags Icon and Dropdown */}
+            <TouchableOpacity style={styles.rowItem} onPress={toggleCategoryModal}>
+              <AntDesign name="tags" size={24} color="black" />
+              <Text style={styles.categoryText}>
+                {selectedCategory || "Category"}
+              </Text>
+              <AntDesign name="caretdown" size={16} color="black" />
+            </TouchableOpacity>
           </View>
-          {/* Tags Icon and Dropdown */}
-          <TouchableOpacity style={styles.rowItem} onPress={toggleCategoryModal}>
-            <AntDesign name="tags" size={24} color="black" />
-            <Text style={styles.categoryText}>{selectedCategory || "Category"}</Text>
-            <AntDesign name="caretdown" size={16} color="black" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Title Input */}
-        <TextInput
-          style={styles.titleInput}
-          placeholder="Title"
-          value={title}
-          onChangeText={setTitle}
-        />
+          {/* Title Input */}
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Title"
+            value={title}
+            onChangeText={setTitle}
+          />
 
-        {/* Content Input */}
-        <TextInput
-          style={styles.contentInput}
-          placeholder="Write your thoughts..."
-          value={content}
-          onChangeText={setContent}
-          multiline
-          textAlignVertical="top"
-        />
+          {/* Content Input */}
+          <TextInput
+            style={styles.contentInput}
+            placeholder="Write your thoughts..."
+            value={content}
+            onChangeText={setContent}
+            multiline
+            textAlignVertical="top"
+          />
 
-        {/* Image Icon */}
-        <TouchableOpacity style={styles.imageIconContainer}>
+          {/* Image Grid */}
+          <View style={styles.imageGrid}>
+            {selectedImages.map((uri, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.imageContainer}
+                onPress={() => handleImagePress(uri)}
+              >
+                <Image source={{ uri }} style={styles.thumbnailImage} />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={() => removeImage(index)}
+                >
+                  <AntDesign name="closecircle" size={20} color="red" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Bottom Image Picker */}
+        <TouchableOpacity style={styles.bottomImagePicker} onPress={pickImage}>
           <Ionicons name="images-outline" size={24} color="black" />
+          <Text style={styles.imagePickerText}>Add Images</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Image Preview Modal */}
+      <Modal visible={!!selectedImage} transparent animationType="fade">
+        <View style={styles.imagePreviewContainer}>
+          <TouchableOpacity 
+            style={styles.closePreviewButton}
+            onPress={() => setSelectedImage(null)}
+          >
+            <AntDesign name="close" size={24} color="white" />
+          </TouchableOpacity>
+          {selectedImage && (
+            <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+          )}
+        </View>
+      </Modal>
+
       {/* Category Modal */}
-      <Modal
-        visible={isCategoryModalVisible}
-        transparent
-        animationType="slide"
-      >
+      <Modal visible={isCategoryModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <FlatList
@@ -147,96 +269,181 @@ export default AddDiary;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   saveButton: {
-    backgroundColor: '#007FFF',
+    backgroundColor: "#007FFF",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
   saveButtonText: {
-    color: 'white',
-    fontWeight: '500',
+    color: "white",
+    fontWeight: "500",
+  },
+  formContainer: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+    padding: 16,
+  },
+  scrollContent: {
+    flex: 1,
   },
   form: {
     padding: 16,
-    flex: 1,
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 16,
   },
   rowItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   dateText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   categoryText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   titleInput: {
     fontSize: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: "#ddd",
     paddingVertical: 8,
     marginBottom: 16,
   },
   contentInput: {
-    flex: 1,
+    minHeight: 200,
     fontSize: 15,
     lineHeight: 24,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
   },
   imageIconContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    borderStyle: 'dashed',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    width: '80%',
-    backgroundColor: '#fff',
+    width: "80%",
+    backgroundColor: "#fff",
     borderRadius: 8,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   categoryItem: {
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    width: '100%',
+    borderBottomColor: "#ddd",
+    width: "100%",
   },
   closeButton: {
     marginTop: 16,
-    backgroundColor: '#007FFF',
+    backgroundColor: "#007FFF",
     padding: 10,
     borderRadius: 8,
   },
   closeButtonText: {
-    color: 'white',
-    fontWeight: '500',
+    color: "white",
+    fontWeight: "500",
+  },
+  imageContainer: {
+    width: '30%',
+    aspectRatio: 1,
+    margin: '1.66%',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  selectedImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 5,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    right: 5,
+    top: 5,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 2,
+  },
+  bottomImagePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    backgroundColor: 'white',
+  },
+  imagePickerText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: 'black',
+  },
+  imageScrollView: {
+    marginVertical: 10,
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  imagePreviewContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closePreviewButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  previewImage: {
+    width: '90%',
+    height: '80%',
+    resizeMode: 'contain',
   },
 });

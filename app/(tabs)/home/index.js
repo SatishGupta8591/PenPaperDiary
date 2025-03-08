@@ -110,14 +110,18 @@ const index = () => {
 
   const markTodoAsCompleted = async (todoId) => {
     try {
-      setMarked(true);
+      const completedAt = new Date().toISOString(); // Create ISO string for consistent date format
       const response = await axios.patch(
-        `http://192.168.1.110:8000/todos/${todoId}/complete`
+        `http://192.168.1.110:8000/todos/${todoId}/complete`,
+        { 
+          status: "completed",
+          completedAt: completedAt
+        }
       );
-      console.log(response.data);
-      await getUserTodos(userId); // Refresh the todos list
+      console.log("Todo completed:", response.data);
+      await getUserTodos(userId); // Refresh todos list after completion
     } catch (error) {
-      console.log("error", error);
+      console.error("Error completing todo:", error);
     }
   };
 
@@ -176,6 +180,19 @@ const index = () => {
         },
       ]
     );
+  };
+
+  const revertTodoToPending = async (todoId) => {
+    try {
+      const response = await axios.patch(
+        `http://192.168.1.110:8000/todos/${todoId}/revert`
+      );
+      console.log("Todo reverted:", response.data);
+      await getUserTodos(userId); // Refresh the todos list
+    } catch (error) {
+      console.error("Error reverting todo:", error);
+      Alert.alert("Error", "Failed to revert todo");
+    }
   };
 
   console.log("completed", completedTodos);
@@ -311,6 +328,22 @@ const index = () => {
                           name="circle" 
                           size={18} 
                           color="gray"
+                          onPress={() => {
+                            Alert.alert(
+                              "Revert Todo",
+                              "Do you want to mark this task as pending?",
+                              [
+                                {
+                                  text: "Cancel",
+                                  style: "cancel"
+                                },
+                                {
+                                  text: "Yes",
+                                  onPress: () => revertTodoToPending(item._id)
+                                }
+                              ]
+                            );
+                          }}
                         />
                         <View style={{ flex: 1 }}>
                           <Text style={{
@@ -320,7 +353,11 @@ const index = () => {
                           <Text style={{
                             color: "gray",
                             fontSize: 12,
-                          }}>Completed on {moment(item?.completedAt).format("MMM Do, h:mm a")}</Text>
+                          }}>
+                            {item?.completedAt 
+                              ? `Completed on ${moment(item.completedAt).format("MMM Do, h:mm a")}`
+                              : "Completion date unknown"}
+                          </Text>
                         </View>
                         <Feather name="flag" size={20} color="black" />
                         <EvilIcons name="trash" size={30} color="black" onPress={() => deleteTodo(item?._id)} />

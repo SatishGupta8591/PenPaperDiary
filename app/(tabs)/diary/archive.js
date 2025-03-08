@@ -42,6 +42,33 @@ const ArchiveScreen = () => {
     }
   };
 
+  const handleUnarchive = async (diaryId) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
+
+      await axios.patch(`http://192.168.1.110:8000/diary/${diaryId}/unarchive`, {
+        userId: userId
+      });
+
+      Alert.alert("Success", "Diary unarchived successfully");
+      fetchArchivedDiaries(); // Refresh the list
+    } catch (error) {
+      console.error("Error unarchiving diary:", error);
+      Alert.alert("Error", "Failed to unarchive diary");
+    }
+  };
+
+  const viewDiaryDetail = (diary) => {
+    router.push({
+      pathname: "/diary/diarydetails",
+      params: { diaryId: diary._id }
+    });
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -61,8 +88,19 @@ const ArchiveScreen = () => {
           data={archivedDiaries}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
-            <View style={styles.diaryItem}>
-              <Text style={styles.diaryTitle}>{item.title}</Text>
+            <TouchableOpacity 
+              style={styles.diaryItem} 
+              onPress={() => viewDiaryDetail(item)}
+            >
+              <View style={styles.diaryHeader}>
+                <Text style={styles.diaryTitle}>{item.title}</Text>
+                <TouchableOpacity 
+                  onPress={() => handleUnarchive(item._id)}
+                  style={styles.unarchiveButton}
+                >
+                  <Ionicons name="archive-outline" size={24} color="#007BFF" />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.diaryContent} numberOfLines={2}>
                 {item.content}
               </Text>
@@ -70,7 +108,7 @@ const ArchiveScreen = () => {
                 {moment(item.date).format('MMM DD, YYYY')}
               </Text>
               <Text style={styles.diaryCategory}>{item.category}</Text>
-            </View>
+            </TouchableOpacity>
           )}
         />
       ) : (
@@ -108,6 +146,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: '#6c757d',
+    elevation: 2,
+  },
+  diaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
   },
   diaryTitle: {
     fontSize: 16,
@@ -128,6 +173,14 @@ const styles = StyleSheet.create({
     color: '#007BFF',
     fontSize: 12,
     marginTop: 5,
+  },
+  unarchiveButton: {
+    padding: 5,
+  },
+  viewDetailButton: {
+    color: '#007BFF',
+    fontSize: 14,
+    marginTop: 10,
   },
   emptyContainer: {
     flex: 1,

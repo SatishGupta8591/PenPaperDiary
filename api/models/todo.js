@@ -30,15 +30,20 @@ const todoSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  completedAt: {
+    type: Date,
+    default: null
+  },
   dueDate: {
-    type: String,
-    required: true
+    type: Date,
+    default: Date.now
   },
   createdAt: {
     type: Date,
     default: Date.now
-  },
-  subtasks: [subtaskSchema] // This is important
+  }
+}, {
+  timestamps: true
 });
 
 const Todo = mongoose.model("Todo", todoSchema);

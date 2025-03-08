@@ -10,8 +10,8 @@ const app = express();
 const port = 8000;
 
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '50mb' })); // Increase payload limit
 
 mongoose
   .connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/PenPaperDiary", {
@@ -25,10 +25,23 @@ mongoose
     console.error("MongoDB connection error:", error);
   });
 
+mongoose.connection.on("error", (err) => {
+  console.error("MongoDB connection error:", err);
+});
+
+mongoose.connection.on("connected", () => {
+  console.log("MongoDB connected successfully");
+});
+
+mongoose.connection.on("disconnected", () => {
+  console.log("MongoDB disconnected");
+});
+
 const secretKey = crypto.randomBytes(32).toString("hex");
 
 const User = require("./models/user");
 const Todo = require("./models/todo");
+const Diary = require("./models/diary");
 
 app.post("/register", async (req, res) => {
   try {
@@ -132,39 +145,47 @@ app.post("/todos/:userId", async (req, res) => {
 
 app.get("/users/:userId/todos", async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const { userId } = req.params;
+    const { status } = req.query;
 
-    const todos = await Todo.find({ userId }); // Filter todos by userId
-    if (!todos) {
-      return res.status(404).json({ error: "No todos found" });
+    const query = { userId };
+    if (status) {
+      query.status = status;
     }
 
+    const todos = await Todo.find(query).sort({ createdAt: -1 });
     res.status(200).json({ todos });
   } catch (error) {
-    res.status(500).json({ error: "Something went wrong" });
+    console.error("Error fetching todos:", error);
+    res.status(500).json({ error: "Failed to fetch todos" });
   }
 });
+
 app.patch("/todos/:todoId/complete", async (req, res) => {
   try {
-    const todoId = req.params.todoId;
+    const { todoId } = req.params;
+    const { completedAt } = req.body;
 
     const updatedTodo = await Todo.findByIdAndUpdate(
       todoId,
       {
         status: "completed",
+        completedAt: completedAt
       },
       { new: true }
     );
 
     if (!updatedTodo) {
-      return res.status(404).json({ error: "Todo not found" });
+      return res.status(404).json({ message: "Todo not found" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Todo marked as complete", todo: updatedTodo });
+    res.status(200).json({
+      message: "Todo marked as completed",
+      todo: updatedTodo
+    });
   } catch (error) {
-    res.status(500).json({ error: "Something went wrong" });
+    console.error("Error completing todo:", error);
+    res.status(500).json({ message: "Error completing todo", error: error.message });
   }
 });
 
@@ -188,25 +209,25 @@ app.get("/todos/completed/:date", async (req, res) => {
 
 app.get("/todos/count", async (req, res) => {
   try {
-    const userId = req.query.userId;
-
+    const { userId } = req.query;
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
 
     const totalCompletedTodos = await Todo.countDocuments({
-      userId: userId,
-      status: "completed",
-    }).exec();
+      userId,
+      status: "completed"
+    });
 
     const totalPendingTodos = await Todo.countDocuments({
-      userId: userId,
-      status: "pending",
-    }).exec();
+      userId,
+      status: "pending"
+    });
 
     res.status(200).json({ totalCompletedTodos, totalPendingTodos });
   } catch (error) {
-    res.status(500).json({ error: "Network error" });
+    console.error("Error getting todo counts:", error);
+    res.status(500).json({ error: "Failed to get todo counts" });
   }
 });
 
@@ -251,8 +272,6 @@ app.get("/user", async (req, res) => {
   }
 });
 
-const Diary = require("./models/diary");
-
 // Modify the GET endpoint for diaries
 app.get("/diary/:userId", async (req, res) => {
   try {
@@ -293,28 +312,61 @@ app.get("/diary/:userId/archived", async (req, res) => {
   }
 });
 
+// Get single diary entry
+app.get("/diary/:diaryId", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+    const diary = await Diary.findById(diaryId);
+    
+    if (!diary) {
+      return res.status(404).json({ message: "Diary not found" });
+    }
+
+    res.status(200).json({ diary });
+  } catch (error) {
+    console.error("Error fetching diary:", error);
+    res.status(500).json({ message: "Failed to fetch diary" });
+  }
+});
+
 // Modify the POST endpoint
 app.post("/diary", async (req, res) => {
   try {
-    const { userId, title, content, category } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
+    const { userId, title, content, category, date, images } = req.body;
+
+    // Validation
+    if (!userId || !title || !content || !category) {
+      return res.status(400).json({ 
+        message: "Missing required fields",
+        required: ["userId", "title", "content", "category"]
+      });
     }
-    
+
     const newDiary = new Diary({
       userId,
       title,
       content,
       category,
-      date: new Date()
+      date: date || new Date(),
+      images: Array.isArray(images) ? images : [], // Ensure images is an array
     });
-    
-    await newDiary.save();
-    res.status(200).json({ message: "Diary saved successfully", diary: newDiary });
+
+    const savedDiary = await newDiary.save();
+    console.log("Diary saved successfully:", {
+      id: savedDiary._id,
+      imageCount: savedDiary.images.length
+    });
+
+    res.status(200).json({ 
+      message: "Diary added successfully", 
+      diary: savedDiary 
+    });
   } catch (error) {
-    console.error("Error saving diary:", error);
-    res.status(500).json({ error: "Failed to save diary" });
+    console.error("Error adding diary:", error);
+    res.status(500).json({ 
+      message: "Failed to add diary",
+      error: error.message 
+    });
   }
 });
 
@@ -322,30 +374,31 @@ app.post("/diary", async (req, res) => {
 app.put("/diary/:diaryId", async (req, res) => {
   try {
     const { diaryId } = req.params;
-    const { userId, title, content, category } = req.body;
-    
+    const { userId, title, content, category, date, images } = req.body;
+
     const updatedDiary = await Diary.findByIdAndUpdate(
       diaryId,
       {
+        userId,
         title,
         content,
         category,
-        updatedAt: new Date()
+        date,
+        images, // Update array of images
       },
       { new: true }
     );
-    
+
     if (!updatedDiary) {
-      return res.status(404).json({ error: "Diary entry not found" });
+      return res.status(404).json({ error: "Diary not found" });
     }
-    
-    res.status(200).json({ 
-      message: "Diary updated successfully", 
-      diary: updatedDiary 
-    });
+
+    res
+      .status(200)
+      .json({ message: "Diary updated successfully", diary: updatedDiary });
   } catch (error) {
     console.error("Error updating diary:", error);
-    res.status(500).json({ error: "Failed to update diary" });
+    res.status(500).json({ message: "Failed to update diary" });
   }
 });
 
@@ -374,6 +427,34 @@ app.patch("/diary/:diaryId/archive", async (req, res) => {
   } catch (error) {
     console.error("Error archiving diary:", error);
     res.status(500).json({ error: "Failed to archive diary" });
+  }
+});
+
+// Unarchive diary endpoint
+app.patch("/diary/:diaryId/unarchive", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+
+    const updatedDiary = await Diary.findByIdAndUpdate(
+      diaryId,
+      {
+        isArchived: false,
+        archivedAt: null,
+      },
+      { new: true }
+    );
+
+    if (!updatedDiary) {
+      return res.status(404).json({ error: "Diary not found" });
+    }
+
+    res.status(200).json({
+      message: "Diary unarchived successfully",
+      diary: updatedDiary,
+    });
+  } catch (error) {
+    console.error("Error unarchiving diary:", error);
+    res.status(500).json({ error: "Failed to unarchive diary" });
   }
 });
 
@@ -549,6 +630,35 @@ app.get("/todos/:userId/completed", async (req, res) => {
   }
 });
 
+app.patch("/todos/:todoId/revert", async (req, res) => {
+  try {
+    const { todoId } = req.params;
+    
+    const updatedTodo = await Todo.findByIdAndUpdate(
+      todoId,
+      {
+        $set: {
+          status: "pending",
+          completedAt: null
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedTodo) {
+      return res.status(404).json({ message: "Todo not found" });
+    }
+
+    res.status(200).json({
+      message: "Todo reverted to pending",
+      todo: updatedTodo
+    });
+  } catch (error) {
+    console.error("Error reverting todo:", error);
+    res.status(500).json({ message: "Error reverting todo", error: error.message });
+  }
+});
+
 app.get("/health", async (req, res) => {
   try {
     const status = mongoose.connection.readyState;
@@ -573,6 +683,60 @@ app.use((err, req, res, next) => {
     message: "Internal server error", 
     error: process.env.NODE_ENV === 'development' ? err.message : undefined 
   });
+});
+
+// Add to your User schema
+const userSchema = new mongoose.Schema({
+  // ...existing fields...
+  securityPin: {
+    type: String,
+    minlength: 4,
+    maxlength: 4
+  }
+});
+
+// Add new endpoints for PIN management
+app.post("/users/set-pin", async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    
+    if (!pin || pin.length !== 4 || !/^\d+$/.test(pin)) {
+      return res.status(400).json({ message: "PIN must be 4 digits" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { securityPin: pin },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "PIN set successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error setting PIN", error: error.message });
+  }
+});
+
+app.post("/users/verify-pin", async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.securityPin !== pin) {
+      return res.status(401).json({ message: "Invalid PIN" });
+    }
+
+    res.status(200).json({ message: "PIN verified successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error verifying PIN", error: error.message });
+  }
 });
 
 app.listen(port, () => {

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView, RefreshControl } from 'react-native';
 import React, { useState, useEffect } from "react";
 import moment from "moment";
 import { Calendar } from "react-native-calendars";
@@ -8,6 +8,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router'; // Import useRouter
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const index = () => {
   const today = moment().format("YYYY-MM-DD");
@@ -18,6 +19,8 @@ const index = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter(); // Initialize useRouter
   const [showDiaryEntries, setShowDiaryEntries] = useState(false); // Add this state
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(moment().format('YYYY-MM'));
 
   const fetchCompletedTodos = async () => {
     try {
@@ -96,12 +99,46 @@ const index = () => {
     }
   };
 
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    setSelectedDate(moment().format('YYYY-MM-DD'));
+    fetchCompletedTodos();
+    fetchDiaryEntries(moment().format('YYYY-MM-DD'));
+    setRefreshing(false);
+  }, []);
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "white" }}>
+    <ScrollView 
+      style={{ flex: 1, backgroundColor: "white" }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <Calendar
         onDayPress={handleDayPress}
         markedDates={{
           [selectedDate]: { selected: true, selectedColor: "#7CB9E8" },
+        }}
+        enableSwipeMonths={true}
+        current={selectedDate}
+        onMonthChange={(month) => {
+          setCurrentMonth(month.dateString);
+        }}
+        theme={{
+          todayTextColor: '#007BFF',
+          selectedDayBackgroundColor: '#007BFF',
+          arrowColor: '#007BFF',
+          monthTextColor: '#333',
+          textMonthFontSize: 16,
+          textMonthFontWeight: 'bold',
+          textDayFontSize: 14,
+          'stylesheet.calendar.header': {
+            week: {
+              marginTop: 5,
+              flexDirection: 'row',
+              justifyContent: 'space-between'
+            }
+          }
         }}
       />
       
@@ -128,25 +165,37 @@ const index = () => {
 
       {showCompleted && (
         <View style={styles.sectionContainer}>
-          {todos?.map((item, index) => (
-            <Pressable
-              style={styles.taskItem}
-              key={index}
-            >
-              <View style={styles.taskContent}>
-                <FontAwesome name="circle" size={18} color="gray" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.taskTitle}>
-                    {item?.title}
-                  </Text>
-                  <Text style={styles.taskTime}>
-                    Completed at {moment(item?.createdAt).format("h:mm a")}
-                  </Text>
+          <Text style={styles.sectionTitle}>
+            Completed Tasks for {moment(selectedDate).format('MMMM D, YYYY')}
+          </Text>
+          
+          {todos.length > 0 ? (
+            todos.map((item, index) => (
+              <Pressable
+                style={styles.taskItem}
+                key={index}
+              >
+                <View style={styles.taskContent}>
+                  <FontAwesome name="circle" size={18} color="gray" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.taskTitle}>
+                      {item?.title}
+                    </Text>
+                    <Text style={styles.taskTime}>
+                      Completed at {moment(item?.createdAt).format("h:mm a")}
+                    </Text>
+                  </View>
+                  <Feather name="flag" size={20} color="gray" />
                 </View>
-                <Feather name="flag" size={20} color="gray" />
-              </View>
-            </Pressable>
-          ))}
+              </Pressable>
+            ))
+          ) : (
+            <View style={styles.noTasksContainer}>
+              <Text style={styles.messageText}>
+                No completed tasks for {moment(selectedDate).format('MMMM D, YYYY')}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -272,6 +321,32 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '500',
+  },
+  noTasksContainer: {
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  messageText: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+  },
+  calendarWrapper: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 
