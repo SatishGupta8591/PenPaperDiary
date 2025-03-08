@@ -27,6 +27,7 @@ function DiaryScreen() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
 
   // Refs
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -47,19 +48,19 @@ function DiaryScreen() {
   // check pin function
   const checkPin = async () => {
     try {
-      if (isAuthenticated) return; // Don't check if already authenticated
+      if (isAuthenticated) return;
       
       const userId = await AsyncStorage.getItem('userId');
       const pin = await AsyncStorage.getItem(`securityPin_${userId}`);
+      const welcomeShown = await AsyncStorage.getItem('welcomeShown');
       const hasPin = !!pin;
       setIsPinSet(hasPin);
       
-      if (!hasPin && isInitialCheck) {
-        // First time user - show PIN setup
-        setPinModalVisible(true);
+      if (!hasPin && isInitialCheck && !welcomeShown) {
+        // Show welcome popup for first-time users
+        setShowWelcomePopup(true);
         setIsInitialCheck(false);
       } else if (hasPin && !isAuthenticated) {
-        // Existing user - need verification
         setPinModalVisible(true);
       }
     } catch (error) {
@@ -278,6 +279,45 @@ function DiaryScreen() {
     fetchDiaries();
   }, [date]);
 
+  // Add this component inside DiaryScreen but before the return statement
+  const WelcomePopup = () => (
+    <Modal
+      visible={showWelcomePopup}
+      transparent={true}
+      animationType="fade"
+    >
+      <View style={styles.welcomeModalContainer}>
+        <View style={styles.welcomeModalContent}>
+          <Text style={styles.welcomeTitle}>Welcome to Your Personal Diary!</Text>
+          <Text style={styles.welcomeMessage}>
+            Would you like to set up a security PIN to protect your diary?
+          </Text>
+          <View style={styles.welcomeButtonContainer}>
+            <TouchableOpacity 
+              style={[styles.welcomeButton, { backgroundColor: '#666' }]}
+              onPress={() => {
+                setShowWelcomePopup(false);
+                AsyncStorage.setItem('welcomeShown', 'true');
+              }}
+            >
+              <Text style={styles.welcomeButtonText}>Later</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.welcomeButton, { backgroundColor: '#007BFF' }]}
+              onPress={() => {
+                setShowWelcomePopup(false);
+                AsyncStorage.setItem('welcomeShown', 'true');
+                router.push('/(tabs)/diary/settings');
+              }}
+            >
+              <Text style={styles.welcomeButtonText}>Set Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -408,7 +448,13 @@ function DiaryScreen() {
               <MaterialIcons name="archive" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>Archive Entries</Text>
             </Pressable>
-            <Pressable style={styles.modalOption} onPress={() => { setMenuVisible(false); }}>
+            <Pressable 
+              style={styles.modalOption} 
+              onPress={() => {
+                setMenuVisible(false);
+                router.push('/(tabs)/diary/settings');
+              }}
+            >
               <SimpleLineIcons name="settings" size={24} color="white" style={styles.iconStyle} />
               <Text style={styles.textStyle}>Settings</Text>
             </Pressable>
@@ -434,10 +480,12 @@ function DiaryScreen() {
           setPinModalVisible(false);
           if (verified) {
             setIsAuthenticated(true);
-            fetchDiaries(); // This should be called after authentication is set
+            fetchDiaries();
           }
         }}
       />
+
+      <WelcomePopup />
     </View>
   );
 };
@@ -608,6 +656,52 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  welcomeModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  welcomeModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '85%',
+    alignItems: 'center',
+    elevation: 5,
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  welcomeMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  welcomeButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  welcomeButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    minWidth: 120,
+  },
+  welcomeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 

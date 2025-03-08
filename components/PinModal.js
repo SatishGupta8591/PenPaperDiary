@@ -145,24 +145,26 @@ const PinModal = ({ isVisible, onClose, mode = 'verify' }) => {
           </Text>
           
           <TextInput
-            style={styles.input}
+            style={[styles.input, { fontSize: 12 }]} // Reduced font size here
             value={pin}
             onChangeText={setPin}
             keyboardType="numeric"
             maxLength={4}
             secureTextEntry
             placeholder="Enter 4-digit PIN"
+            placeholderTextColor="#999"
           />
 
           {mode === 'set' && (
             <TextInput
-              style={styles.input}
+              style={[styles.input, { fontSize: 12 }]} // Reduced font size here
               value={confirmPin}
               onChangeText={setConfirmPin}
               keyboardType="numeric"
               maxLength={4}
               secureTextEntry
               placeholder="Confirm PIN"
+              placeholderTextColor="#999"
             />
           )}
 
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginBottom: 15,
-    fontSize: 16,
+    fontSize: 14, // Reduced from 16 to 14
     textAlign: 'center',
     letterSpacing: 8,
     backgroundColor: '#fff',
