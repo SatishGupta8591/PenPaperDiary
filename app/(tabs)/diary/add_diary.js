@@ -31,6 +31,8 @@ const AddDiary = () => {
     useLocalSearchParams();
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [newCategory, setNewCategory] = useState('');
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -140,6 +142,35 @@ const AddDiary = () => {
     setSelectedImage(uri);
   };
 
+  const addNewCategory = () => {
+    if (newCategory.trim()) {
+      setCategories([...categories, newCategory.trim()]);
+      setNewCategory('');
+    }
+  };
+
+  const deleteCategory = (categoryToDelete) => {
+    setCategories(categories.filter(cat => cat !== categoryToDelete));
+  };
+
+  const handleLongPressCategory = (category) => {
+    Alert.alert(
+      "Delete Category",
+      `Are you sure you want to delete "${category}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: () => deleteCategory(category),
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -239,23 +270,53 @@ const AddDiary = () => {
       <Modal visible={isCategoryModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
+            <Text style={styles.modalTitle}>Categories</Text>
+            
+            <View style={styles.addCategoryContainer}>
+              <TextInput
+                style={styles.categoryInput}
+                value={newCategory}
+                onChangeText={setNewCategory}
+                placeholder="Add new category"
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity
+                style={[styles.addButton, !newCategory.trim() && styles.addButtonDisabled]}
+                onPress={addNewCategory}
+                disabled={!newCategory.trim()}
+              >
+                <AntDesign name="plus" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.categoryScrollView}>
+              {categories.map((item, index) => (
                 <TouchableOpacity
-                  style={styles.categoryItem}
+                  key={index}
+                  style={[
+                    styles.categoryItemContainer,
+                    selectedCategory === item && styles.selectedCategoryItem
+                  ]}
                   onPress={() => handleCategorySelect(item)}
+                  onLongPress={() => handleLongPressCategory(item)}
+                  delayLongPress={500}
                 >
-                  <Text style={styles.categoryText}>{item}</Text>
+                  <Text style={[
+                    styles.categoryItemText,
+                    selectedCategory === item && styles.selectedCategoryText
+                  ]}>
+                    {item}
+                  </Text>
+                  <Text style={styles.longPressHint}>Long press to delete</Text>
                 </TouchableOpacity>
-              )}
-            />
+              ))}
+            </ScrollView>
+
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.closeModalButton}
               onPress={toggleCategoryModal}
             >
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Text style={styles.closeModalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -358,11 +419,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    width: "80%",
-    backgroundColor: "#fff",
+    width: '80%',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
-    alignItems: "center",
+    maxHeight: '80%', // Limit modal height
+  },
+  categoryScrollView: {
+    maxHeight: 200, // Fixed height for scroll view
   },
   categoryItem: {
     padding: 10,
@@ -446,4 +510,79 @@ const styles = StyleSheet.create({
     height: '80%',
     resizeMode: 'contain',
   },
+  addCategoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  categoryItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  deleteButton: {
+    padding: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  categoryInput: {
+    flex: 1,
+    height: 45,
+    borderWidth: 1,
+    borderColor: '#007FFF',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    marginRight: 10,
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#007FFF',
+    width: 45,
+    height: 45,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  selectedCategoryItem: {
+    backgroundColor: '#e6f3ff',
+  },
+  categoryItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedCategoryText: {
+    color: '#007FFF',
+    fontWeight: 'bold',
+  },
+  longPressHint: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  closeModalButton: {
+    backgroundColor: '#007FFF',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 15,
+  },
+  closeModalButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '500',
+  }
 });

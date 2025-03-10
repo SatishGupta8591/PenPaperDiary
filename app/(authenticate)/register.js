@@ -1,218 +1,430 @@
-import {
-  StyleSheet,
-  Pressable,
-  Text,
-  View,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  TextInput,
-  Alert,
-} from "react-native";
-import React from "react";
-import { useState, useEffect } from "react";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRouter } from "expo-router";
-import axios from "axios";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import axios from 'axios';
+import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-axios.interceptors.request.use(request => {
-  console.log('Request:', request);
-  return request;
-});
-
-const register = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+const Register = () => {
   const router = useRouter();
-  const handleRegister = async () => {
+  const params = useLocalSearchParams();
+  const isUpdateMode = params.mode === 'updateMobile';
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (isUpdateMode) {
+        try {
+          const userId = await AsyncStorage.getItem('userId');
+          const userName = await AsyncStorage.getItem('userName');
+          const userEmail = await AsyncStorage.getItem('userEmail');
+          const userMobile = await AsyncStorage.getItem(`userMobile_${userId}`);
+
+          setName(userName || '');
+          setEmail(userEmail || '');
+          setPhoneNumber(userMobile || '');
+        } catch (error) {
+          console.error('Error loading user data:', error);
+          Alert.alert('Error', 'Failed to load user data');
+        }
+      }
+    };
+
+    loadUserData();
+  }, [isUpdateMode]);
+
+  const handleSubmit = async () => {
+    if (isUpdateMode) {
+      try {
+        if (!phoneNumber.trim()) {
+          Alert.alert('Error', 'Please enter your mobile number');
+          return;
+        }
+
+        if (!/^\d{10}$/.test(phoneNumber.trim())) {
+          Alert.alert('Error', 'Please enter a valid 10-digit mobile number');
+          return;
+        }
+
+        setLoading(true);
+        const userId = await AsyncStorage.getItem('userId');
+        
+        // Update in backend first
+        await axios.patch('http://192.168.1.110:8000/users/update-mobile', {
+          userId,
+          phoneNumber: phoneNumber.trim()
+        });
+
+        // If backend update successful, update locally
+        await AsyncStorage.setItem(`userMobile_${userId}`, phoneNumber.trim());
+
+        Alert.alert(
+          'Success', 
+          'Mobile number updated successfully',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } catch (error) {
+        Alert.alert('Error', 'Failed to update mobile number');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
+      // Regular registration validation
+      if (!name.trim() || !email.trim() || !password) {
+        Alert.alert("Error", "Name, email and password are required");
+        return;
+      }
+
+      if (phoneNumber && !/^\d{10}$/.test(phoneNumber.trim())) {
+        Alert.alert("Error", "Please enter a valid 10-digit phone number or leave it empty");
+        return;
+      }
+
       setLoading(true);
-      const userData = {
+      const response = await axios.post("http://192.168.1.110:8000/register", {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password: password
-      };
-  
-      const response = await axios.post("http://192.168.1.110:8000/register", userData);
-      
-      if (response.data) {
+        password,
+        phoneNumber: phoneNumber.trim() || undefined
+      });
+
+      if (response.data.status === 'success') {
         Alert.alert("Success", "Registration successful!");
         router.replace("/login");
       }
-  
     } catch (error) {
-      // Different error types
-      if (!error.response) {
-        // Network error
-        Alert.alert("Error", "Network connection failed. Please check your internet.");
-      } 
-      else if (error.response.status === 400) {
-        // Validation error
-        Alert.alert("Registration Failed", error.response.data.message || "Invalid input data");
-      }
-      else if (error.response.status === 500) {
-        // Server error
-        Alert.alert("Error", "Server error occurred. Please try again later.");
-      }
-      else {
-        // Generic error
-        Alert.alert("Registration Failed", "An unexpected error occurred");
-      }
-      console.log("Error:", error.response?.data || error.message);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Registration failed"
+      );
     } finally {
       setLoading(false);
     }
   };
-  return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: "white", alignItems: "center" }}
-    >
-      <View style={{ marginTop: 100 }}>
-        <Text style={{ fontSize: 25, fontWeight: "00", color: "#0066b2" }}>
-          PenPaperDiary
-        </Text>
-      </View>
-      <KeyboardAvoidingView>
-        <View style={{ alignItems: "center" }}>
-          <Text style={{ fontSize: 20, fontWeight: "600", marginTop: 30 }}>
-            Register to your account
-          </Text>
+
+  if (isUpdateMode) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Update Mobile Number</Text>
         </View>
-        <View style={{ marginTop: 70 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              backgroundColor: "#E0E0E0",
-              paddingVertical: 5,
-              borderRadius: 5,
-              marginTop: 30,
-            }}
-          >
-            <Ionicons
-              style={{ marginLeft: 8 }}
-              name="person"
-              size={24}
-              color="gray"
-            />
-            <TextInput
-              value={name}
-              onChangeText={(text) => setName(text)}
-              style={{
-                color: "gray",
-                marginVertical: 1,
-                width: 300,
-                fontSize: email ? 17 : 17,
-              }}
-              placeholder="Enter your Name"
-            ></TextInput>
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              backgroundColor: "#E0E0E0",
-              paddingVertical: 5,
-              borderRadius: 5,
-              marginTop: 30,
-            }}
-          >
-            <MaterialIcons
-              style={{ marginLeft: 8 }}
-              name="email"
-              size={24}
-              color="gray"
-            />
-            <TextInput
-              value={email}
-              onChangeText={(text) => setEmail(text)}
-              style={{
-                color: "gray",
-                marginVertical: 1,
-                width: 300,
-                fontSize: email ? 17 : 17,
-              }}
-              placeholder="Enter your email"
-            ></TextInput>
-          </View>
-          <View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-                backgroundColor: "#E0E0E0",
-                paddingVertical: 5,
-                borderRadius: 5,
-                marginTop: 30,
-              }}
-            >
-              <AntDesign
-                style={{ marginLeft: 8 }}
-                name="lock"
-                size={24}
-                color="gray"
-              />
-              <TextInput
-                value={password}
-                secureTextEntry={true}
-                onChangeText={(text) => setPassword(text)}
-                style={{
-                  color: "gray",
-                  marginVertical: 1,
-                  width: 300,
-                  fontSize: email ? 17 : 17,
-                }}
-                placeholder="Enter your Password"
-              ></TextInput>
+
+        <View style={styles.formContainer}>
+          <View style={styles.userInfoSection}>
+            <Text style={styles.sectionTitle}>Current Information</Text>
+            <View style={styles.userInfoItem}>
+              <MaterialIcons name="person" size={20} color="#666" />
+              <Text style={styles.userInfoText}>{name}</Text>
+            </View>
+            <View style={styles.userInfoItem}>
+              <MaterialIcons name="email" size={20} color="#666" />
+              <Text style={styles.userInfoText}>{email}</Text>
             </View>
           </View>
 
-          <View style={{ marginTop: 60 }} />
+          <View style={styles.inputSection}>
+            <Text style={styles.sectionTitle}>Enter Mobile Number</Text>
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="phone" size={24} color="#666" style={styles.inputIcon} />
+              <TextInput
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={styles.input}
+                placeholder="Enter your mobile number"
+                keyboardType="phone-pad"
+                maxLength={10}
+                autoFocus={true}
+              />
+            </View>
+          </View>
 
-          <Pressable
-            onPress={handleRegister}
+          <TouchableOpacity 
+            style={[
+              styles.updateButton,
+              { opacity: loading ? 0.7 : 1 }
+            ]}
+            onPress={handleSubmit}
             disabled={loading}
-            style={{
-              width: 200,
-              backgroundColor: loading ? "#cccccc" : "#6699CC",
-              padding: 15,
-              borderRadius: 6,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}
           >
-            <Text
-              style={{
-                textAlign: "center",
-                color: "white",
-                fontWeight: "bold",
-                fontSize: 16,
-              }}
-            >
-              {loading ? "Registering..." : "Register"}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.replace("/login")}
-            style={{ marginTop: 15 }}
-          >
-            <Text style={{ textAlign: "center", fontSize: 15, color: "gray" }}>
-              Already have an account? Sign Up
-            </Text>
-          </Pressable>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.updateButtonText}>Update Mobile Number</Text>
+            )}
+          </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+        >
+          <MaterialIcons name="arrow-back" size={24} color="#0066b2" />
+        </TouchableOpacity>
+        <Text style={styles.headerText}>
+          {isUpdateMode ? 'Update Mobile Number' : 'Register'}
+        </Text>
+      </View>
+
+      <KeyboardAvoidingView behavior="padding" style={styles.formContainer}>
+        {isUpdateMode ? (
+          <>
+            <Text style={styles.subtitle}>Current Information</Text>
+            
+            <View style={[styles.inputContainer, { backgroundColor: '#f8f8f8' }]}>
+              <MaterialIcons name="person" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={name}
+                style={[styles.input, { color: '#666' }]}
+                editable={false}
+              />
+            </View>
+
+            <View style={[styles.inputContainer, { backgroundColor: '#f8f8f8' }]}>
+              <MaterialIcons name="email" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={email}
+                style={[styles.input, { color: '#666' }]}
+                editable={false}
+              />
+            </View>
+
+            <Text style={[styles.subtitle, { marginTop: 20 }]}>Update Mobile Number</Text>
+            
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="phone" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={styles.input}
+                placeholder="Enter your mobile number"
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="person" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+                placeholder="Enter your name"
+                editable={!isUpdateMode}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="email" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                style={styles.input}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                editable={!isUpdateMode}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="lock" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                style={styles.input}
+                placeholder="Enter your password"
+                secureTextEntry
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="phone" size={24} color="gray" style={styles.icon} />
+              <TextInput
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={styles.input}
+                placeholder="Enter your mobile number (optional)"
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            </View>
+          </>
+        )}
+
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {isUpdateMode ? 'Update Mobile Number' : 'Register'}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {!isUpdateMode && (
+          <TouchableOpacity 
+            style={styles.loginLink}
+            onPress={() => router.replace("/login")}
+          >
+            <Text style={styles.loginText}>
+              Already have an account? Login
+            </Text>
+          </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
-export default register;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  headerContainer: {
+    marginTop: 60,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  headerText: {
+    fontSize: 25,
+    fontWeight: '600',
+    color: '#0066b2',
+  },
+  formContainer: {
+    padding: 20,
+    marginTop: 30,
+  },
+  subtitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  icon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  button: {
+    backgroundColor: '#0066b2',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loginText: {
+    color: '#0066b2',
+    fontSize: 16,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    padding: 5,
+  },
+  header: {
+    backgroundColor: '#007bff',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 4,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+    marginLeft: 20,
+  },
+  userInfoSection: {
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 15,
+  },
+  userInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingVertical: 5,
+  },
+  userInfoText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  inputSection: {
+    marginBottom: 20,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  updateButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  updateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
-const styles = StyleSheet.create({});
+export default Register;

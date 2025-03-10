@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import VerificationModal from './VerificationModal';
 
 const PinModal = ({ isVisible, onClose, mode = 'verify' }) => {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [attempts, setAttempts] = useState(0);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const maxAttempts = 3;
   const router = useRouter();
 
@@ -79,34 +81,8 @@ const PinModal = ({ isVisible, onClose, mode = 'verify' }) => {
     }
   };
 
-  const handleForgotPin = async () => {
-    Alert.alert(
-      "Reset PIN",
-      "Are you sure you want to reset your PIN? You'll need to set a new PIN.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Reset",
-          onPress: async () => {
-            try {
-              const userId = await AsyncStorage.getItem('userId');
-              await AsyncStorage.removeItem(`securityPin_${userId}`);
-              Alert.alert("Success", "PIN has been reset. Please set a new PIN.");
-              onClose(false);
-              // Redirect to home tab after small delay
-              setTimeout(() => {
-                router.replace("/(tabs)/home");
-              }, 500);
-            } catch (error) {
-              Alert.alert("Error", "Failed to reset PIN");
-            }
-          }
-        }
-      ]
-    );
+  const handleForgotPin = () => {
+    setShowVerificationModal(true);
   };
 
   const handleCancel = () => {
@@ -132,68 +108,79 @@ const PinModal = ({ isVisible, onClose, mode = 'verify' }) => {
   }, [isVisible]);
 
   return (
-    <Modal
-      visible={isVisible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleCancel}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.title}>
-            {mode === 'set' ? 'Set Security PIN' : 'Enter Security PIN'}
-          </Text>
-          
-          <TextInput
-            style={[styles.input, { fontSize: 12 }]} // Reduced font size here
-            value={pin}
-            onChangeText={setPin}
-            keyboardType="numeric"
-            maxLength={4}
-            secureTextEntry
-            placeholder="Enter 4-digit PIN"
-            placeholderTextColor="#999"
-          />
-
-          {mode === 'set' && (
+    <>
+      <Modal
+        visible={isVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancel}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.title}>
+              {mode === 'set' ? 'Set Security PIN' : 'Enter Security PIN'}
+            </Text>
+            
             <TextInput
               style={[styles.input, { fontSize: 12 }]} // Reduced font size here
-              value={confirmPin}
-              onChangeText={setConfirmPin}
+              value={pin}
+              onChangeText={setPin}
               keyboardType="numeric"
               maxLength={4}
               secureTextEntry
-              placeholder="Confirm PIN"
+              placeholder="Enter 4-digit PIN"
               placeholderTextColor="#999"
             />
-          )}
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={handleCancel}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            {mode === 'set' && (
+              <TextInput
+                style={[styles.input, { fontSize: 12 }]} // Reduced font size here
+                value={confirmPin}
+                onChangeText={setConfirmPin}
+                keyboardType="numeric"
+                maxLength={4}
+                secureTextEntry
+                placeholder="Confirm PIN"
+                placeholderTextColor="#999"
+              />
+            )}
 
-            <TouchableOpacity
-              style={[styles.button, styles.confirmButton]}
-              onPress={mode === 'set' ? handleSetPin : handleVerifyPin}
-            >
-              <Text style={styles.buttonText}>
-                {mode === 'set' ? 'Set PIN' : 'Verify'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={handleCancel}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.confirmButton]}
+                onPress={mode === 'set' ? handleSetPin : handleVerifyPin}
+              >
+                <Text style={styles.buttonText}>
+                  {mode === 'set' ? 'Set PIN' : 'Verify'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {mode === 'verify' && (
+              <Pressable onPress={handleForgotPin}>
+                <Text style={styles.forgotPin}>Forgot PIN?</Text>
+              </Pressable>
+            )}
           </View>
-
-          {mode === 'verify' && (
-            <Pressable onPress={handleForgotPin}>
-              <Text style={styles.forgotPin}>Forgot PIN?</Text>
-            </Pressable>
-          )}
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      
+      <VerificationModal
+        isVisible={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onSuccess={() => {
+          setShowVerificationModal(false);
+          router.push('/(tabs)/diary/pin-setup');
+        }}
+      />
+    </>
   );
 };
 

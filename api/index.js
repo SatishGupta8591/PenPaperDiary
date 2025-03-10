@@ -42,6 +42,7 @@ const secretKey = crypto.randomBytes(32).toString("hex");
 const User = require("./models/user");
 const Todo = require("./models/todo");
 const Diary = require("./models/diary");
+const Category = require('./models/category');
 
 app.post("/register", async (req, res) => {
   try {
@@ -484,7 +485,7 @@ app.post("/todos/:todoId/subtasks", async (req, res) => {
     const { todoId } = req.params;
     const { title } = req.body;
 
-    console.log("Received request to add subtask:", { todoId, title }); // Debug log
+    console.log("Received request to add subtask:", { todoId, title });
 
     if (!title) {
       return res.status(400).json({ message: "Subtask title is required" });
@@ -496,10 +497,22 @@ app.post("/todos/:todoId/subtasks", async (req, res) => {
       return res.status(404).json({ message: "Todo not found" });
     }
 
-    todo.subtasks.push({ title, completed: false });
+    // Initialize subtasks array if it doesn't exist
+    if (!todo.subtasks) {
+      todo.subtasks = [];
+    }
+
+    // Add new subtask
+    const newSubtask = {
+      title,
+      completed: false,
+      createdAt: new Date()
+    };
+
+    todo.subtasks.push(newSubtask);
     await todo.save();
 
-    console.log("Subtask added successfully"); // Debug log
+    console.log("Subtask added successfully");
 
     res.status(200).json({
       message: "Subtask added successfully",
@@ -692,6 +705,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     minlength: 4,
     maxlength: 4
+  },
+  mobileNumber: {
+    type: String,
+    required: false // Making mobile number optional
+  },
+  hasShownMobilePrompt: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -736,6 +757,73 @@ app.post("/users/verify-pin", async (req, res) => {
     res.status(200).json({ message: "PIN verified successfully" });
   } catch (error) {
     res.status(500).json({ message: "Error verifying PIN", error: error.message });
+  }
+});
+
+// In your API file
+app.patch("/users/update-mobile", async (req, res) => {
+  try {
+    const { userId, phoneNumber } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { mobileNumber: phoneNumber },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Mobile number updated successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating mobile number" });
+  }
+});
+
+// Get categories for a user
+app.get('/categories/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const categories = await Category.find({ userId }).sort({ createdAt: -1 });
+    res.status(200).json({ categories });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ message: 'Failed to fetch categories' });
+  }
+});
+
+// Add a new category
+app.post('/categories', async (req, res) => {
+  try {
+    const { name, userId } = req.body;
+    
+    if (!name || !userId) {
+      return res.status(400).json({ message: 'Name and userId are required' });
+    }
+
+    const category = new Category({
+      name: name.trim(),
+      userId
+    });
+
+    await category.save();
+    res.status(201).json({ category });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ message: 'Failed to create category' });
+  }
+});
+
+// Delete a category
+app.delete('/categories/:categoryId', async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    await Category.findByIdAndDelete(categoryId);
+    res.status(200).json({ message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ message: 'Failed to delete category' });
   }
 });
 

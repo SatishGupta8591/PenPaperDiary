@@ -28,6 +28,7 @@ function DiaryScreen() {
   const [isModalVisible, setIsModalVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Refs
   const slideAnim = useRef(new Animated.Value(-300)).current;
@@ -70,7 +71,7 @@ function DiaryScreen() {
 
   // fetch diaries function
   const fetchDiaries = async () => {
-    if (isLoading) return; // Prevent multiple calls
+    if (isLoading) return;
     
     try {
       setIsLoading(true);
@@ -81,19 +82,21 @@ function DiaryScreen() {
       }
 
       let apiUrl = `http://192.168.1.110:8000/diary/${userId}`;
-      if (date) {
-        apiUrl += `?date=${date}`;
+      if (currentDate) {  // Use currentDate instead of date
+        apiUrl += `?date=${currentDate}`;
       }
 
       const response = await axios.get(apiUrl);
-      // Filter out archived entries
-      const userDiaries = response.data.diaries.filter(
-        (diary) => diary.userId === userId && !diary.isArchived
-      );
-      setDiaries(userDiaries || []);
-      setFilteredDiaries(response.data.diaries);
+      if (response.data) {
+        const userDiaries = response.data.diaries.filter(
+          (diary) => diary.userId === userId && !diary.isArchived
+        );
+        setDiaries(userDiaries || []);
+        setFilteredDiaries(userDiaries || []);
+      }
     } catch (error) {
       console.error("Error fetching diaries:", error);
+      Alert.alert("Error", "Failed to fetch diary entries");
       setDiaries([]);
       setFilteredDiaries([]);
     } finally {
@@ -268,8 +271,20 @@ function DiaryScreen() {
   );
 
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        fetchDiaries();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     fetchDiaries();
-  }, [date, isAuthenticated]);
+  }, [currentDate, isAuthenticated]);
 
   useEffect(() => {
     setFilteredDiaries(diaries);
@@ -601,7 +616,8 @@ const styles = StyleSheet.create({
   },
   centeredView: {
     flex: 1,
-    alignItems: "flex-start",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalView: {
     backgroundColor: '#007bff',
@@ -649,7 +665,6 @@ const styles = StyleSheet.create({
   },
   authContainer: {
     flex: 1,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
   },

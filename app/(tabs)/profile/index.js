@@ -19,6 +19,7 @@ import { useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import moment from 'moment';
+import { Ionicons } from '@expo/vector-icons'; // First add this import
 
 const Index = () => {
   const router = useRouter();
@@ -230,10 +231,14 @@ const Index = () => {
                 </Text>
               </View>
             </View>
-
-            <Pressable onPress={handleLogout}>
-              <MaterialIcons name="logout" size={24} color="#FF6347" />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 15 }}>
+              <Pressable onPress={() => router.push('/(tabs)/profile/settings')}>
+                <Ionicons name="settings-outline" size={24} color="#007BFF" />
+              </Pressable>
+              <Pressable onPress={handleLogout}>
+                <MaterialIcons name="logout" size={24} color="#FF6347" />
+              </Pressable>
+            </View>
           </View>
         </View>
 

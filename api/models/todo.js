@@ -8,6 +8,10 @@ const subtaskSchema = new mongoose.Schema({
   completed: {
     type: Boolean,
     default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 });
 
@@ -38,6 +42,7 @@ const todoSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  subtasks: [subtaskSchema],
   createdAt: {
     type: Date,
     default: Date.now
