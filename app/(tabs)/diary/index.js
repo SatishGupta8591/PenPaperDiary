@@ -36,6 +36,7 @@ function DiaryScreen() {
   // Router and params
   const router = useRouter();
   const { date } = useLocalSearchParams();
+  const params = useLocalSearchParams();
 
   // Add these animation functions after the state declarations
   const animateMenu = (toValue) => {
@@ -81,15 +82,11 @@ function DiaryScreen() {
         return;
       }
 
-      let apiUrl = `http://192.168.1.110:8000/diary/${userId}`;
-      if (currentDate) {  // Use currentDate instead of date
-        apiUrl += `?date=${currentDate}`;
-      }
-
-      const response = await axios.get(apiUrl);
+      const response = await axios.get(`http://192.168.1.110:8000/diary/${userId}`);
+      
       if (response.data) {
         const userDiaries = response.data.diaries.filter(
-          (diary) => diary.userId === userId && !diary.isArchived
+          diary => diary.userId === userId && !diary.isArchived
         );
         setDiaries(userDiaries || []);
         setFilteredDiaries(userDiaries || []);
@@ -198,7 +195,7 @@ function DiaryScreen() {
     );
   };
 
-  // handle archive diary function
+  // Update handleArchiveDiary function
   const handleArchiveDiary = async (diaryId) => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -208,17 +205,19 @@ function DiaryScreen() {
       }
 
       const response = await axios.patch(
-        `http://192.168.1.110:8000/diary/${diaryId}/archive`
+        `http://192.168.1.110:8000/diary/${diaryId}/archive`,
+        { userId } // Add userId to request body
       );
 
-      if (response.data.diary) {
-        setDiaries((prevDiaries) =>
-          prevDiaries.filter((diary) => diary._id !== diaryId)
+      if (response.data && response.data.diary) {
+        setDiaries(prevDiaries => 
+          prevDiaries.filter(diary => diary._id !== diaryId)
         );
-        setFilteredDiaries((prevDiaries) =>
-          prevDiaries.filter((diary) => diary._id !== diaryId)
+        setFilteredDiaries(prevDiaries => 
+          prevDiaries.filter(diary => diary._id !== diaryId)
         );
         Alert.alert("Success", "Diary archived successfully");
+        fetchDiaries(); // Refresh the list after archiving
       }
     } catch (error) {
       console.error("Error archiving diary:", error);
@@ -270,6 +269,12 @@ function DiaryScreen() {
     }, [isAuthenticated])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchDiaries();
+    }, [])
+  );
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
@@ -289,6 +294,12 @@ function DiaryScreen() {
   useEffect(() => {
     setFilteredDiaries(diaries);
   }, [diaries]);
+
+  useEffect(() => {
+    if (params?.refresh) {
+      fetchDiaries();
+    }
+  }, [params?.refresh]);
 
   const onRefresh = useCallback(() => {
     fetchDiaries();
@@ -721,3 +732,49 @@ const styles = StyleSheet.create({
 });
 
 export default DiaryScreen;
+
+// Update handleSave function in add_diary.js
+const handleSave = async () => {
+  try {
+    // ... existing validation code ...
+
+    const diaryData = {
+      userId: userId,
+      title: title.trim(),
+      content: content.trim(),
+      category: selectedCategory,
+      date: moment().format("YYYY-MM-DD"),
+      images: selectedImages || [],
+    };
+
+    let response;
+    if (isEditing) {
+      response = await axios.put(
+        `http://192.168.1.110:8000/diary/${diaryId}`,
+        diaryData
+      );
+    } else {
+      response = await axios.post("http://192.168.1.110:8000/diary", diaryData);
+    }
+
+    if (response.data) {
+      Alert.alert(
+        "Success",
+        isEditing ? "Diary updated successfully" : "Diary saved successfully",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              router.back();
+              // Force refresh the diary list
+              router.replace("/diary");
+            }
+          }
+        ]
+      );
+    }
+  } catch (error) {
+    console.log("Error saving diary:", error.response?.data || error);
+    Alert.alert("Error", "Failed to save diary entry");
+  }
+};

@@ -8,6 +8,10 @@ import {
   TextInput,
   Platform,
   Alert,
+  Animated,
+  Image,
+  TouchableOpacity,
+  ScrollView
 } from "react-native";
 import React from "react";
 import { useState, useEffect } from "react";
@@ -16,6 +20,9 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import { useRouter } from "expo-router";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Animatable from 'react-native-animatable';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts, Poppins_600SemiBold, Poppins_400Regular } from '@expo-google-fonts/poppins';
 
 axios.interceptors.request.use(request => {
   console.log('Request:', JSON.stringify(request, null, 2));
@@ -38,6 +45,12 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [fontsLoaded] = useFonts({
+    Poppins_600SemiBold,
+    Poppins_400Regular
+  });
+
+  const logoAnim = new Animated.Value(0);
 
   useEffect(() => {
     const checkLoginStatus = async () => {
@@ -56,6 +69,14 @@ const Login = () => {
       }
     };
     checkLoginStatus();
+
+    Animated.sequence([
+      Animated.timing(logoAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ]).start();
   }, []);
 
   const handleLogin = async () => {
@@ -94,138 +115,196 @@ const Login = () => {
     }
   };
 
-  const renderLoginButton = () => (
-    <Pressable
-      onPress={handleLogin}
-      disabled={loading}
-      style={{
-        width: 200,
-        backgroundColor: loading ? "#cccccc" : "#6699CC",
-        padding: 15,
-        borderRadius: 6,
-        marginLeft: "auto",
-        marginRight: "auto",
-      }}
-    >
-      <Text
-        style={{
-          textAlign: "center",
-          color: "white",
-          fontWeight: "bold",
-          fontSize: 16,
-        }}
-      >
-        {loading ? "Logging in..." : "Login"}
-      </Text>
-    </Pressable>
-  );
-
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: "white", alignItems: "center" }}
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
     >
-      <View style={{ marginTop: 100 }}>
-        <Text style={{ fontSize: 25, fontWeight: "00", color: "#0066b2" }}>
-          PenPaperDiary
-        </Text>
-      </View>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <View style={{ alignItems: "center" }}>
-          <Text style={{ fontSize: 20, fontWeight: "600", marginTop: 30 }}>
-            Log in to your account
-          </Text>
-        </View>
-        <View style={{ marginTop: 70 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              backgroundColor: "#E0E0E0",
-              paddingVertical: 5,
-              borderRadius: 5,
-              marginTop: 30,
-            }}
+      <LinearGradient
+        colors={['#007bff', '#00a5ff']}
+        style={styles.gradientBackground}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+        >
+          <Animatable.View 
+            animation="fadeInDown" 
+            duration={1500}
+            style={styles.headerContainer}
           >
-            <MaterialIcons
-              style={{ marginLeft: 8 }}
-              name="email"
-              size={24}
-              color="gray"
+            <Image 
+              source={require('../../assets/images/icon.png')}
+              style={styles.logo}
             />
-            <TextInput
-              value={email}
-              onChangeText={(text) => setEmail(text)}
-              style={{
-                color: "gray",
-                marginVertical: 1,
-                width: 300,
-                fontSize: email ? 17 : 17,
-              }}
-              placeholder="Enter your email"
-            ></TextInput>
-          </View>
-          <View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-                backgroundColor: "#E0E0E0",
-                paddingVertical: 5,
-                borderRadius: 5,
-                marginTop: 30,
-              }}
+            <Animatable.Text 
+              animation="fadeIn"
+              delay={500}
+              style={styles.appTitle}
             >
-              <AntDesign
-                style={{ marginLeft: 8 }}
-                name="lock"
-                size={24}
-                color="gray"
+              PenPaperDiary
+            </Animatable.Text>
+          </Animatable.View>
+
+          <Animatable.View 
+            animation="fadeInUpBig"
+            duration={1000}
+            style={styles.formContainer}
+          >
+            <Text style={styles.welcomeText}>Welcome Back!</Text>
+            <Text style={styles.subtitleText}>Sign in to continue</Text>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="email" size={24} color="#007bff" style={styles.inputIcon} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                style={styles.input}
+                placeholderTextColor="#999"
               />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="lock" size={24} color="#007bff" style={styles.inputIcon} />
               <TextInput
                 value={password}
-                secureTextEntry={true}
-                onChangeText={(text) => setPassword(text)}
-                style={{
-                  color: "gray",
-                  marginVertical: 1,
-                  width: 300,
-                  fontSize: email ? 17 : 17,
-                }}
-                placeholder="Enter your Password"
-              ></TextInput>
+                onChangeText={setPassword}
+                placeholder="Password"
+                secureTextEntry
+                style={styles.input}
+                placeholderTextColor="#999"
+              />
             </View>
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 12,
-              justifyContent: "space-between",
-            }}
-          >
-            <Text>Keep me logged in</Text>
-            <Text style={{ color: "#007FFF", fontWeight: "500" }}>
-              Forgot Password
-            </Text>
-          </View>
-          <View style={{ marginTop: 60 }} />
-          {renderLoginButton()}
-          <Pressable
-            onPress={() => router.replace("/register")}
-            style={{ marginTop: 15 }}
-          >
-            <Text style={{ textAlign: "center", fontSize: 15, color: "gray" }}>
-              Don't have an account? Sign up
-            </Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+            <TouchableOpacity 
+              style={styles.loginButton}
+              onPress={handleLogin}
+            >
+              <LinearGradient
+                colors={['#007bff', '#00a5ff']}
+                style={styles.gradient}
+              >
+                <Text style={styles.loginButtonText}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.registerLink}
+              onPress={() => router.replace("/register")}
+            >
+              <Text style={styles.registerText}>
+                New here? <Text style={styles.registerHighlight}>Create Account</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animatable.View>
+        </ScrollView>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 };
 
 export default Login;
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  gradientBackground: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingHorizontal: 20
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
+    tintColor: 'white', // This will make logo white for better visibility
+  },
+  appTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 28,
+    color: 'white',
+    letterSpacing: 1,
+  },
+  formContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    marginTop: 40,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 30,
+    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
+  },
+  welcomeText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 24,
+    color: '#333',
+    marginBottom: 10,
+  },
+  subtitleText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 30,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    marginBottom: 20,
+    paddingHorizontal: 15,
+    height: 55,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  inputIcon: {
+    marginRight: 15,
+  },
+  input: {
+    flex: 1,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+  },
+  loginButton: {
+    marginTop: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  gradient: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 18,
+  },
+  registerLink: {
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  registerText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 16,
+    color: '#666',
+  },
+  registerHighlight: {
+    color: '#007bff',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    minHeight: '100%'
+  }
+});

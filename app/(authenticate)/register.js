@@ -1,9 +1,11 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Alert, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Animatable from 'react-native-animatable';
 
 const Register = () => {
   const router = useRouter();
@@ -110,321 +112,216 @@ const Register = () => {
     }
   };
 
-  if (isUpdateMode) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Update Mobile Number</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          <View style={styles.userInfoSection}>
-            <Text style={styles.sectionTitle}>Current Information</Text>
-            <View style={styles.userInfoItem}>
-              <MaterialIcons name="person" size={20} color="#666" />
-              <Text style={styles.userInfoText}>{name}</Text>
-            </View>
-            <View style={styles.userInfoItem}>
-              <MaterialIcons name="email" size={20} color="#666" />
-              <Text style={styles.userInfoText}>{email}</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputSection}>
-            <Text style={styles.sectionTitle}>Enter Mobile Number</Text>
-            <View style={styles.inputContainer}>
-              <MaterialIcons name="phone" size={24} color="#666" style={styles.inputIcon} />
-              <TextInput
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                style={styles.input}
-                placeholder="Enter your mobile number"
-                keyboardType="phone-pad"
-                maxLength={10}
-                autoFocus={true}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity 
-            style={[
-              styles.updateButton,
-              { opacity: loading ? 0.7 : 1 }
-            ]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.updateButtonText}>Update Mobile Number</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <LinearGradient
+        colors={['#0066b2', '#00a5ff']}
+        style={styles.gradientBackground}
+      >
+        <Animatable.View 
+          animation="fadeInDown" 
+          duration={1500}
+          style={styles.headerContainer}
         >
-          <MaterialIcons name="arrow-back" size={24} color="#0066b2" />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>
-          {isUpdateMode ? 'Update Mobile Number' : 'Register'}
-        </Text>
-      </View>
+          <Image 
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+          />
+          <Animatable.Text 
+            animation="fadeIn"
+            delay={500}
+            style={styles.appTitle}
+          >
+            PenPaperDiary
+          </Animatable.Text>
+        </Animatable.View>
 
-      <KeyboardAvoidingView behavior="padding" style={styles.formContainer}>
-        {isUpdateMode ? (
-          <>
-            <Text style={styles.subtitle}>Current Information</Text>
-            
-            <View style={[styles.inputContainer, { backgroundColor: '#f8f8f8' }]}>
-              <MaterialIcons name="person" size={24} color="gray" style={styles.icon} />
-              <TextInput
-                value={name}
-                style={[styles.input, { color: '#666' }]}
-                editable={false}
-              />
-            </View>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+        >
+          <Animatable.View 
+            animation="fadeInUpBig"
+            duration={1000}
+            style={styles.formContainer}
+          >
+            <Text style={styles.welcomeText}>Create Account</Text>
+            <Text style={styles.subtitleText}>Sign up to get started</Text>
 
-            <View style={[styles.inputContainer, { backgroundColor: '#f8f8f8' }]}>
-              <MaterialIcons name="email" size={24} color="gray" style={styles.icon} />
-              <TextInput
-                value={email}
-                style={[styles.input, { color: '#666' }]}
-                editable={false}
-              />
-            </View>
-
-            <Text style={[styles.subtitle, { marginTop: 20 }]}>Update Mobile Number</Text>
-            
             <View style={styles.inputContainer}>
-              <MaterialIcons name="phone" size={24} color="gray" style={styles.icon} />
-              <TextInput
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                style={styles.input}
-                placeholder="Enter your mobile number"
-                keyboardType="phone-pad"
-                maxLength={10}
-              />
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.inputContainer}>
-              <MaterialIcons name="person" size={24} color="gray" style={styles.icon} />
+              <MaterialIcons name="person" size={24} color="#0066b2" style={styles.inputIcon} />
               <TextInput
                 value={name}
                 onChangeText={setName}
+                placeholder="Full Name"
                 style={styles.input}
-                placeholder="Enter your name"
-                editable={!isUpdateMode}
+                placeholderTextColor="#999"
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <MaterialIcons name="email" size={24} color="gray" style={styles.icon} />
+              <MaterialIcons name="email" size={24} color="#0066b2" style={styles.inputIcon} />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
+                placeholder="Email Address"
                 style={styles.input}
-                placeholder="Enter your email"
+                placeholderTextColor="#999"
                 keyboardType="email-address"
-                editable={!isUpdateMode}
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <MaterialIcons name="lock" size={24} color="gray" style={styles.icon} />
+              <MaterialIcons name="lock" size={24} color="#0066b2" style={styles.inputIcon} />
               <TextInput
                 value={password}
                 onChangeText={setPassword}
+                placeholder="Password"
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholderTextColor="#999"
                 secureTextEntry
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <MaterialIcons name="phone" size={24} color="gray" style={styles.icon} />
+              <MaterialIcons name="phone" size={24} color="#0066b2" style={styles.inputIcon} />
               <TextInput
                 value={phoneNumber}
                 onChangeText={setPhoneNumber}
+                placeholder="Mobile Number (Optional)"
                 style={styles.input}
-                placeholder="Enter your mobile number (optional)"
+                placeholderTextColor="#999"
                 keyboardType="phone-pad"
                 maxLength={10}
               />
             </View>
-          </>
-        )}
 
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isUpdateMode ? 'Update Mobile Number' : 'Register'}
-            </Text>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.registerButton}
+              onPress={handleSubmit}
+            >
+              <LinearGradient
+                colors={['#0066b2', '#00a5ff']}
+                style={styles.gradient}
+              >
+                <Text style={styles.registerButtonText}>
+                  {loading ? 'Creating Account...' : 'Sign Up'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-        {!isUpdateMode && (
-          <TouchableOpacity 
-            style={styles.loginLink}
-            onPress={() => router.replace("/login")}
-          >
-            <Text style={styles.loginText}>
-              Already have an account? Login
-            </Text>
-          </TouchableOpacity>
-        )}
-      </KeyboardAvoidingView>
-    </View>
+            <TouchableOpacity 
+              style={styles.loginLink}
+              onPress={() => router.replace("/login")}
+            >
+              <Text style={styles.loginText}>
+                Already have an account? <Text style={styles.loginHighlight}>Sign In</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animatable.View>
+        </ScrollView>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+  },
+  gradientBackground: {
+    flex: 1,
+    width: '100%',
   },
   headerContainer: {
-    marginTop: 60,
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
+    marginTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
   },
-  headerText: {
-    fontSize: 25,
-    fontWeight: '600',
-    color: '#0066b2',
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 10,
+    tintColor: 'white',
+  },
+  appTitle: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 24,
+    color: 'white',
+    letterSpacing: 1,
   },
   formContainer: {
-    padding: 20,
+    flex: 1,
+    backgroundColor: 'white',
     marginTop: 30,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 20,
+    paddingTop: 30,
   },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 30,
-    textAlign: 'center',
+  welcomeText: {
+    fontFamily: 'Poppins_600SemiBold',
+    fontSize: 22,
+    color: '#333',
+    marginBottom: 8,
+  },
+  subtitleText: {
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 25,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
     marginBottom: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
-  icon: {
-    marginRight: 10,
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 15,
   },
-  button: {
-    backgroundColor: '#0066b2',
-    padding: 15,
-    borderRadius: 5,
+  registerButton: {
+    marginTop: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+  },
+  gradient: {
+    padding: 13,
     alignItems: 'center',
-    marginTop: 20,
   },
-  buttonText: {
+  registerButtonText: {
     color: 'white',
+    fontFamily: 'Poppins_600SemiBold',
     fontSize: 16,
-    fontWeight: '600',
   },
   loginLink: {
     marginTop: 20,
     alignItems: 'center',
+    paddingBottom: 20,
   },
   loginText: {
-    color: '#0066b2',
-    fontSize: 16,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 20,
-    padding: 5,
-  },
-  header: {
-    backgroundColor: '#007bff',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 4,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    marginLeft: 20,
-  },
-  userInfoSection: {
-    backgroundColor: '#f8f8f8',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-  },
-  userInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    paddingVertical: 5,
-  },
-  userInfoText: {
-    marginLeft: 10,
-    fontSize: 16,
+    fontFamily: 'Poppins_400Regular',
+    fontSize: 14,
     color: '#666',
   },
-  inputSection: {
-    marginBottom: 20,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  updateButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  updateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  loginHighlight: {
+    color: '#0066b2',
+    fontFamily: 'Poppins_600SemiBold',
+  }
 });
 
 export default Register;

@@ -10,39 +10,21 @@ const app = express();
 const port = 8000;
 
 app.use(cors());
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.use(bodyParser.json({ limit: '50mb' })); // Increase payload limit
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
-mongoose
-  .connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/PenPaperDiary", {
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  })
-  .then(() => {
-    console.log("Connected to MongoDB Atlas");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection error:", error);
-  });
-
-mongoose.connection.on("error", (err) => {
-  console.error("MongoDB connection error:", err);
-});
-
-mongoose.connection.on("connected", () => {
-  console.log("MongoDB connected successfully");
-});
-
-mongoose.connection.on("disconnected", () => {
-  console.log("MongoDB disconnected");
-});
+mongoose.connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/PenPaperDiary", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000,
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 const secretKey = crypto.randomBytes(32).toString("hex");
 
 const User = require("./models/user");
 const Todo = require("./models/todo");
-const Diary = require("./models/diary");
-const Category = require('./models/category');
 
 app.post("/register", async (req, res) => {
   try {
@@ -81,16 +63,16 @@ app.post("/register", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("Login attempt with:", { email, password });
+    console.log("Login attempt with:", { email, password }); // Debug log
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email }).maxTimeMS(5000); // Add timeout
+    const user = await User.findOne({ email });
 
     if (!user) {
-      console.log("User not found");
+      console.log("User not found"); // Debug log
       return res.status(401).json({ message: "Invalid Email" });
     }
 
@@ -98,21 +80,21 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
+    // Ensure `secretKey` is static
+    const secretKey = process.env.JWT_SECRET || "your-static-secret-key";
+
+    // ✅ Fix: Return userId along with the token
     const token = jwt.sign({ userId: user._id }, secretKey, { expiresIn: "7d" });
 
     res.status(200).json({
       token,
-      userId: user._id.toString(),
-      name: user.name,
+      userId: user._id.toString(), // Convert ObjectId to string
+      name: user.name, // Also send user name to store in AsyncStorage
     });
 
   } catch (error) {
     console.error("Login error details:", error);
-    res.status(500).json({ 
-      message: "Login failed", 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    res.status(500).json({ message: "Login failed", error: error.message });
   }
 });
 
@@ -146,47 +128,39 @@ app.post("/todos/:userId", async (req, res) => {
 
 app.get("/users/:userId/todos", async (req, res) => {
   try {
-    const { userId } = req.params;
-    const { status } = req.query;
+    const userId = req.params.userId;
 
-    const query = { userId };
-    if (status) {
-      query.status = status;
+    const todos = await Todo.find({ userId }); // Filter todos by userId
+    if (!todos) {
+      return res.status(404).json({ error: "No todos found" });
     }
 
-    const todos = await Todo.find(query).sort({ createdAt: -1 });
     res.status(200).json({ todos });
   } catch (error) {
-    console.error("Error fetching todos:", error);
-    res.status(500).json({ error: "Failed to fetch todos" });
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
-
 app.patch("/todos/:todoId/complete", async (req, res) => {
   try {
-    const { todoId } = req.params;
-    const { completedAt } = req.body;
+    const todoId = req.params.todoId;
 
     const updatedTodo = await Todo.findByIdAndUpdate(
       todoId,
       {
         status: "completed",
-        completedAt: completedAt
       },
       { new: true }
     );
 
     if (!updatedTodo) {
-      return res.status(404).json({ message: "Todo not found" });
+      return res.status(404).json({ error: "Todo not found" });
     }
 
-    res.status(200).json({
-      message: "Todo marked as completed",
-      todo: updatedTodo
-    });
+    res
+      .status(200)
+      .json({ message: "Todo marked as complete", todo: updatedTodo });
   } catch (error) {
-    console.error("Error completing todo:", error);
-    res.status(500).json({ message: "Error completing todo", error: error.message });
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
@@ -210,25 +184,25 @@ app.get("/todos/completed/:date", async (req, res) => {
 
 app.get("/todos/count", async (req, res) => {
   try {
-    const { userId } = req.query;
+    const userId = req.query.userId;
+
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
 
     const totalCompletedTodos = await Todo.countDocuments({
-      userId,
-      status: "completed"
-    });
+      userId: userId,
+      status: "completed",
+    }).exec();
 
     const totalPendingTodos = await Todo.countDocuments({
-      userId,
-      status: "pending"
-    });
+      userId: userId,
+      status: "pending",
+    }).exec();
 
     res.status(200).json({ totalCompletedTodos, totalPendingTodos });
   } catch (error) {
-    console.error("Error getting todo counts:", error);
-    res.status(500).json({ error: "Failed to get todo counts" });
+    res.status(500).json({ error: "Network error" });
   }
 });
 
@@ -273,6 +247,8 @@ app.get("/user", async (req, res) => {
   }
 });
 
+const Diary = require("./models/diary");
+
 // Modify the GET endpoint for diaries
 app.get("/diary/:userId", async (req, res) => {
   try {
@@ -313,20 +289,61 @@ app.get("/diary/:userId/archived", async (req, res) => {
   }
 });
 
-// Get single diary entry
-app.get("/diary/:diaryId", async (req, res) => {
+// Add or update the archive endpoint
+app.patch("/diary/:diaryId/archive", async (req, res) => {
   try {
     const { diaryId } = req.params;
-    const diary = await Diary.findById(diaryId);
+    const { userId } = req.body;
+
+    if (!diaryId || !userId) {
+      return res.status(400).json({ error: "DiaryId and userId are required" });
+    }
     
+    const diary = await Diary.findOneAndUpdate(
+      { _id: diaryId, userId: userId },
+      {
+        isArchived: true,
+        archivedAt: new Date()
+      },
+      { new: true }
+    );
+
     if (!diary) {
-      return res.status(404).json({ message: "Diary not found" });
+      return res.status(404).json({ error: "Diary not found" });
     }
 
-    res.status(200).json({ diary });
+    res.status(200).json({ 
+      message: "Diary archived successfully", 
+      diary 
+    });
   } catch (error) {
-    console.error("Error fetching diary:", error);
-    res.status(500).json({ message: "Failed to fetch diary" });
+    console.error("Error archiving diary:", error);
+    res.status(500).json({ error: "Failed to archive diary" });
+  }
+});
+
+// Add unarchive diary endpoint
+app.patch("/diary/:diaryId/unarchive", async (req, res) => {
+  try {
+    const { diaryId } = req.params;
+    
+    const diary = await Diary.findByIdAndUpdate(
+      diaryId,
+      {
+        isArchived: false,
+        archivedAt: null
+      },
+      { new: true }
+    );
+
+    if (!diary) {
+      return res.status(404).json({ error: "Diary not found" });
+    }
+
+    res.status(200).json({ message: "Diary unarchived successfully", diary });
+  } catch (error) {
+    console.error("Error unarchiving diary:", error);
+    res.status(500).json({ error: "Failed to unarchive diary" });
   }
 });
 
@@ -334,39 +351,37 @@ app.get("/diary/:diaryId", async (req, res) => {
 app.post("/diary", async (req, res) => {
   try {
     const { userId, title, content, category, date, images } = req.body;
-
-    // Validation
-    if (!userId || !title || !content || !category) {
+    
+    console.log("Received diary data:", req.body); // Debug log
+    
+    if (!userId || !title || !content) {
       return res.status(400).json({ 
-        message: "Missing required fields",
-        required: ["userId", "title", "content", "category"]
+        error: "Missing required fields", 
+        required: "userId, title, content" 
       });
     }
 
     const newDiary = new Diary({
       userId,
-      title,
-      content,
-      category,
+      title: title.trim(),
+      content: content.trim(),
+      category: category || 'Personal',
       date: date || new Date(),
-      images: Array.isArray(images) ? images : [], // Ensure images is an array
+      images: images || []
     });
 
     const savedDiary = await newDiary.save();
-    console.log("Diary saved successfully:", {
-      id: savedDiary._id,
-      imageCount: savedDiary.images.length
-    });
+    console.log("Diary saved:", savedDiary); // Debug log
 
-    res.status(200).json({ 
-      message: "Diary added successfully", 
+    res.status(201).json({ 
+      message: "Diary saved successfully", 
       diary: savedDiary 
     });
   } catch (error) {
-    console.error("Error adding diary:", error);
+    console.error("Server error saving diary:", error);
     res.status(500).json({ 
-      message: "Failed to add diary",
-      error: error.message 
+      error: "Failed to save diary",
+      details: error.message 
     });
   }
 });
@@ -375,107 +390,30 @@ app.post("/diary", async (req, res) => {
 app.put("/diary/:diaryId", async (req, res) => {
   try {
     const { diaryId } = req.params;
-    const { userId, title, content, category, date, images } = req.body;
-
+    const { userId, title, content, category } = req.body;
+    
     const updatedDiary = await Diary.findByIdAndUpdate(
       diaryId,
       {
-        userId,
         title,
         content,
         category,
-        date,
-        images, // Update array of images
+        updatedAt: new Date()
       },
       { new: true }
     );
-
+    
     if (!updatedDiary) {
-      return res.status(404).json({ error: "Diary not found" });
+      return res.status(404).json({ error: "Diary entry not found" });
     }
-
-    res
-      .status(200)
-      .json({ message: "Diary updated successfully", diary: updatedDiary });
+    
+    res.status(200).json({ 
+      message: "Diary updated successfully", 
+      diary: updatedDiary 
+    });
   } catch (error) {
     console.error("Error updating diary:", error);
-    res.status(500).json({ message: "Failed to update diary" });
-  }
-});
-
-// Archive diary endpoint
-app.patch("/diary/:diaryId/archive", async (req, res) => {
-  try {
-    const { diaryId } = req.params;
-
-    const updatedDiary = await Diary.findByIdAndUpdate(
-      diaryId,
-      {
-        isArchived: true,
-        archivedAt: new Date(),
-      },
-      { new: true }
-    );
-
-    if (!updatedDiary) {
-      return res.status(404).json({ error: "Diary not found" });
-    }
-
-    res.status(200).json({
-      message: "Diary archived successfully",
-      diary: updatedDiary,
-    });
-  } catch (error) {
-    console.error("Error archiving diary:", error);
-    res.status(500).json({ error: "Failed to archive diary" });
-  }
-});
-
-// Unarchive diary endpoint
-app.patch("/diary/:diaryId/unarchive", async (req, res) => {
-  try {
-    const { diaryId } = req.params;
-
-    const updatedDiary = await Diary.findByIdAndUpdate(
-      diaryId,
-      {
-        isArchived: false,
-        archivedAt: null,
-      },
-      { new: true }
-    );
-
-    if (!updatedDiary) {
-      return res.status(404).json({ error: "Diary not found" });
-    }
-
-    res.status(200).json({
-      message: "Diary unarchived successfully",
-      diary: updatedDiary,
-    });
-  } catch (error) {
-    console.error("Error unarchiving diary:", error);
-    res.status(500).json({ error: "Failed to unarchive diary" });
-  }
-});
-
-// Delete diary endpoint
-app.delete("/diary/:diaryId", async (req, res) => {
-  try {
-    const { diaryId } = req.params;
-    
-    const deletedDiary = await Diary.findByIdAndDelete(diaryId);
-
-    if (!deletedDiary) {
-      return res.status(404).json({ error: "Diary not found" });
-    }
-
-    res.status(200).json({ 
-      message: "Diary deleted successfully"
-    });
-  } catch (error) {
-    console.error("Error deleting diary:", error);
-    res.status(500).json({ error: "Failed to delete diary" });
+    res.status(500).json({ error: "Failed to update diary" });
   }
 });
 
@@ -485,7 +423,7 @@ app.post("/todos/:todoId/subtasks", async (req, res) => {
     const { todoId } = req.params;
     const { title } = req.body;
 
-    console.log("Received request to add subtask:", { todoId, title });
+    console.log("Received request to add subtask:", { todoId, title }); // Debug log
 
     if (!title) {
       return res.status(400).json({ message: "Subtask title is required" });
@@ -497,22 +435,10 @@ app.post("/todos/:todoId/subtasks", async (req, res) => {
       return res.status(404).json({ message: "Todo not found" });
     }
 
-    // Initialize subtasks array if it doesn't exist
-    if (!todo.subtasks) {
-      todo.subtasks = [];
-    }
-
-    // Add new subtask
-    const newSubtask = {
-      title,
-      completed: false,
-      createdAt: new Date()
-    };
-
-    todo.subtasks.push(newSubtask);
+    todo.subtasks.push({ title, completed: false });
     await todo.save();
 
-    console.log("Subtask added successfully");
+    console.log("Subtask added successfully"); // Debug log
 
     res.status(200).json({
       message: "Subtask added successfully",
@@ -643,188 +569,12 @@ app.get("/todos/:userId/completed", async (req, res) => {
   }
 });
 
-app.patch("/todos/:todoId/revert", async (req, res) => {
-  try {
-    const { todoId } = req.params;
-    
-    const updatedTodo = await Todo.findByIdAndUpdate(
-      todoId,
-      {
-        $set: {
-          status: "pending",
-          completedAt: null
-        }
-      },
-      { new: true }
-    );
-
-    if (!updatedTodo) {
-      return res.status(404).json({ message: "Todo not found" });
-    }
-
-    res.status(200).json({
-      message: "Todo reverted to pending",
-      todo: updatedTodo
-    });
-  } catch (error) {
-    console.error("Error reverting todo:", error);
-    res.status(500).json({ message: "Error reverting todo", error: error.message });
-  }
-});
-
-app.get("/health", async (req, res) => {
-  try {
-    const status = mongoose.connection.readyState;
-    const states = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting'
-    };
-    res.json({ 
-      status: states[status], 
-      isConnected: status === 1 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 app.use((err, req, res, next) => {
   console.error("Global error handler:", err);
   res.status(500).json({ 
     message: "Internal server error", 
     error: process.env.NODE_ENV === 'development' ? err.message : undefined 
   });
-});
-
-// Add to your User schema
-const userSchema = new mongoose.Schema({
-  // ...existing fields...
-  securityPin: {
-    type: String,
-    minlength: 4,
-    maxlength: 4
-  },
-  mobileNumber: {
-    type: String,
-    required: false // Making mobile number optional
-  },
-  hasShownMobilePrompt: {
-    type: Boolean,
-    default: false
-  }
-});
-
-// Add new endpoints for PIN management
-app.post("/users/set-pin", async (req, res) => {
-  try {
-    const { userId, pin } = req.body;
-    
-    if (!pin || pin.length !== 4 || !/^\d+$/.test(pin)) {
-      return res.status(400).json({ message: "PIN must be 4 digits" });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { securityPin: pin },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({ message: "PIN set successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error setting PIN", error: error.message });
-  }
-});
-
-app.post("/users/verify-pin", async (req, res) => {
-  try {
-    const { userId, pin } = req.body;
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (user.securityPin !== pin) {
-      return res.status(401).json({ message: "Invalid PIN" });
-    }
-
-    res.status(200).json({ message: "PIN verified successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error verifying PIN", error: error.message });
-  }
-});
-
-// In your API file
-app.patch("/users/update-mobile", async (req, res) => {
-  try {
-    const { userId, phoneNumber } = req.body;
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { mobileNumber: phoneNumber },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({ message: "Mobile number updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error updating mobile number" });
-  }
-});
-
-// Get categories for a user
-app.get('/categories/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const categories = await Category.find({ userId }).sort({ createdAt: -1 });
-    res.status(200).json({ categories });
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    res.status(500).json({ message: 'Failed to fetch categories' });
-  }
-});
-
-// Add a new category
-app.post('/categories', async (req, res) => {
-  try {
-    const { name, userId } = req.body;
-    
-    if (!name || !userId) {
-      return res.status(400).json({ message: 'Name and userId are required' });
-    }
-
-    const category = new Category({
-      name: name.trim(),
-      userId
-    });
-
-    await category.save();
-    res.status(201).json({ category });
-  } catch (error) {
-    console.error('Error creating category:', error);
-    res.status(500).json({ message: 'Failed to create category' });
-  }
-});
-
-// Delete a category
-app.delete('/categories/:categoryId', async (req, res) => {
-  try {
-    const { categoryId } = req.params;
-    await Category.findByIdAndDelete(categoryId);
-    res.status(200).json({ message: 'Category deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting category:', error);
-    res.status(500).json({ message: 'Failed to delete category' });
-  }
 });
 
 app.listen(port, () => {

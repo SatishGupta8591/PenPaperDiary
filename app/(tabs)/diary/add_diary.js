@@ -24,7 +24,7 @@ const AddDiary = () => {
   const [content, setContent] = useState("");
   const [date, setDate] = useState(moment().format("MMMM D, YYYY"));
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [categories, setCategories] = useState(["Personal", "Work", "Travel"]);
+  const [categories, setCategories] = useState(["Personal", "Work", "Travel", "Ideas"]);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
   const router = useRouter();
   const { isEditing, diaryId, initialTitle, initialContent, initialCategory } =
@@ -85,51 +85,69 @@ const AddDiary = () => {
 
   const handleSave = async () => {
     try {
-      if (!title.trim()) {
-        Alert.alert("Error", "Title is required");
-        return;
-      }
-      if (!content.trim()) {
-        Alert.alert("Error", "Content is required");
-        return;
-      }
-      if (!selectedCategory) {
-        Alert.alert("Error", "Please select a category");
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert("Error", "User not found. Please login again.");
         return;
       }
 
-      const userId = await AsyncStorage.getItem("userId");
-      if (!userId) {
-        Alert.alert("Error", "User not authenticated");
+      if (!title.trim() || !content.trim()) {
+        Alert.alert("Error", "Title and content are required");
         return;
       }
 
       const diaryData = {
-        userId: userId,
+        userId,
         title: title.trim(),
         content: content.trim(),
-        category: selectedCategory,
+        category: selectedCategory || 'Personal',
         date: moment().format("YYYY-MM-DD"),
-        images: selectedImages || [], // Make sure images is always an array
+        images: selectedImages || []
       };
 
-      console.log("Sending diary data:", {
-        ...diaryData,
-        images: `${diaryData.images.length} images`
-      });
+      console.log("Sending diary data:", diaryData); // Debug log
 
+      let response;
       if (isEditing) {
-        await axios.put(
+        response = await axios.put(
           `http://192.168.1.110:8000/diary/${diaryId}`,
           diaryData
         );
       } else {
-        await axios.post("http://192.168.1.110:8000/diary", diaryData);
+        response = await axios.post(
+          "http://192.168.1.110:8000/diary",
+          diaryData,
+          {
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
       }
 
-      router.back();
+      if (response.data) {
+        Alert.alert(
+          "Success",
+          isEditing ? "Diary updated successfully" : "Diary saved successfully",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                router.push({
+                  pathname: "/(tabs)/diary",
+                  params: { refresh: 'true' }
+                });
+              }
+            }
+          ]
+        );
+      }
     } catch (error) {
-      console.log("Error saving diary:", error.response?.data || error);
+      console.error("Error saving diary:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       Alert.alert("Error", "Failed to save diary entry");
     }
   };
@@ -143,14 +161,27 @@ const AddDiary = () => {
   };
 
   const addNewCategory = () => {
-    if (newCategory.trim()) {
-      setCategories([...categories, newCategory.trim()]);
-      setNewCategory('');
+    if (!newCategory.trim()) {
+      Alert.alert('Error', 'Please enter a category name');
+      return;
     }
+    if (categories.includes(newCategory.trim())) {
+      Alert.alert('Error', 'Category already exists');
+      return;
+    }
+    setCategories([...categories, newCategory.trim()]);
+    setNewCategory('');
   };
 
   const deleteCategory = (categoryToDelete) => {
+    if (categories.length <= 1) {
+      Alert.alert('Error', 'Cannot delete the last category');
+      return;
+    }
     setCategories(categories.filter(cat => cat !== categoryToDelete));
+    if (selectedCategory === categoryToDelete) {
+      setSelectedCategory(categories[0]);
+    }
   };
 
   const handleLongPressCategory = (category) => {
@@ -158,12 +189,9 @@ const AddDiary = () => {
       "Delete Category",
       `Are you sure you want to delete "${category}"?`,
       [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Delete",
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
           onPress: () => deleteCategory(category),
           style: "destructive"
         }
@@ -270,7 +298,7 @@ const AddDiary = () => {
       <Modal visible={isCategoryModalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Categories</Text>
+            <Text style={styles.modalTitle}>Manage Categories</Text>
             
             <View style={styles.addCategoryContainer}>
               <TextInput
@@ -314,7 +342,7 @@ const AddDiary = () => {
 
             <TouchableOpacity
               style={styles.closeModalButton}
-              onPress={toggleCategoryModal}
+              onPress={() => setCategoryModalVisible(false)}
             >
               <Text style={styles.closeModalButtonText}>Close</Text>
             </TouchableOpacity>

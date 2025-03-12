@@ -28,9 +28,6 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
@@ -47,6 +44,14 @@
         "projectId": "4d627d86-f447-41db-bba5-9f05755b3f38"
       }
     },
-    "owner": "satishgupta"
+    "owner": "satishgupta",
+    "fonts": [
+      {
+        "asset": "./assets/fonts/Poppins-Regular.ttf"
+      },
+      {
+        "asset": "./assets/fonts/Poppins-SemiBold.ttf"
+      }
+    ]
   }
 }

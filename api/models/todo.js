@@ -32,7 +32,7 @@ const todoSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
+    default: 'Personal'  // Default category
   },
   completedAt: {
     type: Date,

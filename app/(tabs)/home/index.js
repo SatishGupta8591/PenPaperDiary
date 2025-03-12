@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Image, TextInput, Alert } from "react-native";
+import { StyleSheet, Text, View, Pressable, ScrollView, Image, TextInput, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect } from "react";
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { BottomModal } from "react-native-modals";
@@ -72,17 +72,24 @@ const index = () => {
   ];
 
   const addTodo = async () => {
+    if (!todo.trim()) return;
+  
     try {
       const todoData = {
-        title: todo,
+        title: todo.trim(),
         category: category,
       };
+      
+      setModalVisible(false); // Close modal first for better UX
+      const tempTodo = todo; // Store todo temporarily
+      setTodo(""); // Clear input immediately
+      
       await axios.post(`http://192.168.1.110:8000/todos/${userId}`, todoData);
       await getUserTodos(userId);
-      setModalVisible(false);
-      setTodo("");
     } catch (error) {
-      console.log(error);
+      console.error("Error adding todo:", error);
+      Alert.alert("Error", "Failed to add todo");
+      setTodo(tempTodo); // Restore todo text if failed
     }
   };
 
@@ -431,9 +438,23 @@ const index = () => {
                 borderWidth: 1,
                 borderRadius: 5,
                 flex: 1,
+                fontSize: 16,
               }}
+              autoCorrect={false}
+              autoCapitalize="sentences"
+              maxLength={100}
+              returnKeyType="done"
+              blurOnSubmit={true}
             />
-            <Ionicons onPress={addTodo} name="send" size={24} color="#007FFF" />
+            <TouchableOpacity 
+              onPress={addTodo}
+              disabled={!todo.trim()}
+              style={{
+                opacity: todo.trim() ? 1 : 0.5,
+              }}
+            >
+              <Ionicons name="send" size={24} color="#007FFF" />
+            </TouchableOpacity>
           </View>
 
           <Text>Choose Category</Text>
