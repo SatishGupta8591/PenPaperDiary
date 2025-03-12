@@ -13,7 +13,7 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-mongoose.connect("mongodb+srv://satish:satish@cluster0.6vc0i.mongodb.net/PenPaperDiary", {
+mongoose.connect("cluster name", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000,
