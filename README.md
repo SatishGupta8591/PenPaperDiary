@@ -48,20 +48,28 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
- ## 📱 App Screenshots
+
+## 📱 App Screenshots
 
 <table>
   <tr>
     <td><img src="https://github.com/user-attachments/assets/81b32342-5e78-4f34-b5d3-0453931ce705" width="250"/></td>
     <td><img src="https://github.com/user-attachments/assets/2525998b-e8df-493c-ad7d-178f6123c517" width="250"/></td>
+      <td><img src="https://github.com/user-attachments/assets/ff638013-702d-498f-9ec0-b6732787bb43" width="250"/></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/ff638013-702d-498f-9ec0-b6732787bb43" width="250"/></td>
+   
+   <td><img src="https://github.com/user-attachments/assets/648f6e5c-bb04-46b0-a7be-3c00f3caa2de" width="250"/></td>
     <td><img src="https://github.com/user-attachments/assets/308a79f9-1963-4eed-a5ba-0e6d785aca22" width="250"/></td>
+    <td><img src="https://github.com/user-attachments/assets/ce35bb91-9281-443a-998f-2f577905e8d0" width="250"/></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/648f6e5c-bb04-46b0-a7be-3c00f3caa2de" width="250"/></td>
-    <td><img src="https://github.com/user-attachments/assets/d24204d3-871e-46c2-9a72-dbb0c5a254e5" width="250"/></td>
+   
+   <td><img src="https://github.com/user-attachments/assets/d24204d3-871e-46c2-9a72-dbb0c5a254e5" width="250"/></td>
+  </tr>
+  <tr>
+   
+    <td></td>
   </tr>
 </table>
 
